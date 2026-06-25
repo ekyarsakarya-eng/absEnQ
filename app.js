@@ -1433,15 +1433,14 @@ async function api(aksi, payload = {}) {
   try {
     const response = await fetch(URL_GAS, {
       method: 'POST',
-      mode: 'cors',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({ aksi, data: payload })
+      // hapus mode:'cors' biar GAS gak preflight
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: aksi, ...payload }) // <-- INI KUNCINYA
     });
-    const data = await response.json();
-    return data;
+    return await response.json();
   } catch (error) {
     console.error('API error:', error);
-    return { status: 'error', message: 'Koneksi internet bermasalah / GAS Error: ' + error.message };
+    return { status: 'error', message: 'Koneksi / GAS Error: ' + error.message };
   }
 }
 
