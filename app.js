@@ -209,7 +209,7 @@ function renderDashboard() {
   </div>
 
   <!-- MODAL KAMERA -->
-  <div id="modalCam" class="fixed inset-0 bg-black/90 hidden items-center justify-center p-4 z-[70]">
+  <div id="modalCam" class="fixed inset-0 bg-black/90 hidden items-center justify-center p-4" style="z-index:9999">
     <div class="bg-white dark:bg-gray-800 rounded-2xl p-4 w-full max-w-md">
       <h3 class="font-bold text-lg mb-3 text-red-800 dark:text-white text-center">
         <i class="fa-solid fa-camera mr-2"></i><span id="judulKamera">Ambil Foto</span>
@@ -293,7 +293,7 @@ function renderDashboard() {
   </div>
 
   <!-- MODAL INPUT PATROLI -->
-  <div id="modalPatroli" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4 z-[60]">
+  <div id="modalPatroli" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4 z-[50]">
     <div class="bg-white dark:bg-gray-900 rounded-3xl w-full max-w-md max-h- flex flex-col shadow-2xl">
       <div class="bg-red-800 px-5 py-4 rounded-t-3xl flex items-center justify-between"><h3 class="font-bold text-lg text-white">Input Patroli</h3><button onclick="closeFormPatroli()"><i class="fa-solid fa-xmark text-xl text-white"></i></button></div>
       <div class="flex-1 overflow-y-auto p-4 space-y-3">
@@ -318,7 +318,7 @@ function renderDashboard() {
   </div>
 
   <!-- MODAL INPUT KEJADIAN -->
-  <div id="modalKejadian" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4 z-[60]">
+  <div id="modalKejadian" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4 z-[50]">
     <div class="bg-white dark:bg-gray-900 rounded-3xl w-full max-w-md max-h- flex flex-col shadow-2xl">
       <div class="bg-red-800 px-5 py-4 rounded-t-3xl flex items-center justify-between"><h3 class="font-bold text-lg text-white">Lapor Kejadian</h3><button onclick="closeFormKejadian()"><i class="fa-solid fa-xmark text-xl text-white"></i></button></div>
       <div class="flex-1 overflow-y-auto p-4 space-y-3">
@@ -388,6 +388,9 @@ function bukaKameraAbsen(type) {
 }
 
 function bukaKameraPatroli() {
+  document.getElementById('modalPatroli').classList.add('hidden');
+  document.getElementById('modalPatroli').classList.remove('flex');
+  
   currentCamMode = 'patroli';
   modalAsal = 'patroli';
   document.getElementById('judulKamera').textContent = 'Foto Lokasi Patroli';
@@ -398,6 +401,9 @@ function bukaKameraPatroli() {
 }
 
 function bukaKameraKejadian() {
+  document.getElementById('modalKejadian').classList.add('hidden');
+  document.getElementById('modalKejadian').classList.remove('flex');
+  
   currentCamMode = 'kejadian';
   modalAsal = 'kejadian';
   document.getElementById('judulKamera').textContent = 'Foto Bukti Kejadian';
