@@ -293,7 +293,7 @@ function renderDashboard() {
   </div>
 
   <!-- MODAL INPUT PATROLI -->
-  <div id="modalPatroli" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4 z-[50]">
+  <div id="modalPatroli" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4 z-[60]">
     <div class="bg-white dark:bg-gray-900 rounded-3xl w-full max-w-md max-h- flex flex-col shadow-2xl">
       <div class="bg-red-800 px-5 py-4 rounded-t-3xl flex items-center justify-between"><h3 class="font-bold text-lg text-white">Input Patroli</h3><button onclick="closeFormPatroli()"><i class="fa-solid fa-xmark text-xl text-white"></i></button></div>
       <div class="flex-1 overflow-y-auto p-4 space-y-3">
@@ -318,7 +318,7 @@ function renderDashboard() {
   </div>
 
   <!-- MODAL INPUT KEJADIAN -->
-  <div id="modalKejadian" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4 z-[50]">
+  <div id="modalKejadian" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4 z-[60]">
     <div class="bg-white dark:bg-gray-900 rounded-3xl w-full max-w-md max-h- flex flex-col shadow-2xl">
       <div class="bg-red-800 px-5 py-4 rounded-t-3xl flex items-center justify-between"><h3 class="font-bold text-lg text-white">Lapor Kejadian</h3><button onclick="closeFormKejadian()"><i class="fa-solid fa-xmark text-xl text-white"></i></button></div>
       <div class="flex-1 overflow-y-auto p-4 space-y-3">
