@@ -994,7 +994,8 @@ async function loadRekap(monthKey = null) {
   try {
     const bulanParam = month.replace('_', '/');
     
-    const res = await api('getRekap', { 
+    // Coba ambil dari sheet REKAP bulanan dulu
+    const res = await api('getRekapFromSheetBulanan', { 
       username: user.username,
       bulan: bulanParam
     });
@@ -1031,29 +1032,15 @@ async function loadRekap(monthKey = null) {
           const records = grouped[key];
           const masuk = records.find(r => r.keterangan === 'IN');
           const pulang = records.find(r => r.keterangan === 'OUT');
-          const izinRecord = records.find(r => r.keterangan === 'IZIN');
-          const alphaRecord = records.find(r => r.keterangan === 'ALPHA');
 
           const tglObj = new Date(records[0].tanggal + 'T00:00:00');
           const tglFormat = tglObj.toLocaleDateString('id-ID', {
             weekday: 'short', day: '2-digit', month: 'short'
           });
 
-          let statusHtml = '';
-          if (izinRecord) {
-            statusHtml = `
-              <div class="flex items-center gap-2 text-yellow-600 dark:text-yellow-400">
-                <i class="fa-solid fa-circle-check"></i>
-                <span class="text-sm font-semibold">Izin</span>
-              </div>`;
-          } else if (alphaRecord) {
-            statusHtml = `
-              <div class="flex items-center gap-2 text-red-600 dark:text-red-400">
-                <i class="fa-solid fa-circle-xmark"></i>
-                <span class="text-sm font-semibold">Alpha</span>
-              </div>`;
-          } else {
-            statusHtml = `
+          return `
+            <div class="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg transition hover:shadow-md">
+              <p class="text-xs font-bold text-gray-600 dark:text-gray-400 mb-2">${tglFormat}</p>
               <div class="flex justify-between items-center mb-1">
                 <div class="flex items-center gap-2">
                   <div class="w-8 h-8 bg-green-100 dark:bg-green-900/30 text-green-600 rounded-lg flex items-center justify-center">
@@ -1071,13 +1058,7 @@ async function loadRekap(monthKey = null) {
                   <span class="text-sm text-gray-700 dark:text-gray-300">Pulang</span>
                 </div>
                 <p class="text-sm font-bold text-gray-800 dark:text-white">${pulang?.jam || '--:--'}</p>
-              </div>`;
-          }
-
-          return `
-            <div class="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg transition hover:shadow-md">
-              <p class="text-xs font-bold text-gray-600 dark:text-gray-400 mb-2">${tglFormat}</p>
-              ${statusHtml}
+              </div>
             </div>
           `;
         }).join('');
