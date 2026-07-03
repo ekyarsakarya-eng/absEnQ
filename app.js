@@ -18,6 +18,7 @@ let dataRekap = [];
 let dataPatroli = [];
 let dataKejadian = [];
 let dataPembinaan = [];
+let selectedMonth = '';
 
 // ============================================
 // PWA INSTALL UNIVERSAL
@@ -25,7 +26,7 @@ let dataPembinaan = [];
 let deferredPrompt;
 const installPopup = document.getElementById('installPopup');
 const btnAndroid = document.getElementById('btnInstallAndroid');
-const btnIOS = document.getElementById('btnInstallIOS');
+const btnIOS = document.getElementById('btnIOS');
 const iosSteps = document.getElementById('iosSteps');
 
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
@@ -122,13 +123,19 @@ async function login() {
   btn.disabled = true;
   btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>Memproses...';
   
-  const res = await api('login', { username, password });
-  if (res.status === 'success') {
-    user = res;
-    localStorage.setItem('user', JSON.stringify(user));
-    render();
-  } else {
-    toast(res.message);
+  try {
+    const res = await api('login', { username, password });
+    if (res.status === 'success') {
+      user = res;
+      localStorage.setItem('user', JSON.stringify(user));
+      render();
+    } else {
+      toast(res.message);
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fa-solid fa-right-to-bracket mr-2"></i>Masuk';
+    }
+  } catch (err) {
+    toast('Koneksi gagal: ' + err.message);
     btn.disabled = false;
     btn.innerHTML = '<i class="fa-solid fa-right-to-bracket mr-2"></i>Masuk';
   }
@@ -743,56 +750,47 @@ async function capture() {
   canvas.height = height;
   ctx.drawImage(video, 0, 0, width, height);
 
-  const scale = Math.max(width / 640, 1); // Minimal scale 1 agar tidak kekecilan
+  const scale = Math.max(width / 640, 1);
 
-// === WATERMARK BOX (DIPERBESAR) ===
-const wmPadding = 14 * scale;
-const wmBoxWidth = 340 * scale;
-const wmBoxHeight = 120 * scale;
-const wmX = 12 * scale;
-const wmY = height - wmBoxHeight - 12 * scale;
+  const wmPadding = 14 * scale;
+  const wmBoxWidth = 340 * scale;
+  const wmBoxHeight = 120 * scale;
+  const wmX = 12 * scale;
+  const wmY = height - wmBoxHeight - 12 * scale;
 
-// Background hitam transparan
-ctx.fillStyle = "rgba(0, 0, 0, 0.78)";
-ctx.fillRect(wmX, wmY, wmBoxWidth, wmBoxHeight);
+  ctx.fillStyle = "rgba(0, 0, 0, 0.78)";
+  ctx.fillRect(wmX, wmY, wmBoxWidth, wmBoxHeight);
 
-// Border merah di kiri (aksen)
-ctx.fillStyle = "#dc2626";
-ctx.fillRect(wmX, wmY, 6 * scale, wmBoxHeight);
+  ctx.fillStyle = "#dc2626";
+  ctx.fillRect(wmX, wmY, 6 * scale, wmBoxHeight);
 
-// Border atas tipis
-ctx.fillStyle = "rgba(255,255,255,0.15)";
-ctx.fillRect(wmX, wmY, wmBoxWidth, 2 * scale);
+  ctx.fillStyle = "rgba(255,255,255,0.15)";
+  ctx.fillRect(wmX, wmY, wmBoxWidth, 2 * scale);
 
-// Posisi teks
-const textX = wmX + wmPadding + 6 * scale;
-let textY = wmY + 26 * scale;
+  const textX = wmX + wmPadding + 6 * scale;
+  let textY = wmY + 26 * scale;
 
-// Baris 1: Tanggal
-ctx.fillStyle = "#ffffff";
-ctx.font = `bold ${15 * scale}px Arial`;
-ctx.fillText(
-  new Date().toLocaleDateString('id-ID', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }),
-  textX, textY
-);
+  ctx.fillStyle = "#ffffff";
+  ctx.font = `bold ${15 * scale}px Arial`;
+  ctx.fillText(
+    new Date().toLocaleDateString('id-ID', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }),
+    textX, textY
+  );
 
-// Baris 2: Jam (lebih besar & kuning)
-textY += 26 * scale;
-ctx.fillStyle = "#facc15";
-ctx.font = `bold ${22 * scale}px Arial`;
-ctx.fillText(new Date().toLocaleTimeString('id-ID'), textX, textY);
+  textY += 26 * scale;
+  ctx.fillStyle = "#facc15";
+  ctx.font = `bold ${22 * scale}px Arial`;
+  ctx.fillText(new Date().toLocaleTimeString('id-ID'), textX, textY);
 
-// Baris 3: Nama
-textY += 24 * scale;
-ctx.fillStyle = "#ffffff";
-ctx.font = `bold ${13 * scale}px Arial`;
-ctx.fillText(`Nama: ${user.nama}`, textX, textY);
+  textY += 24 * scale;
+  ctx.fillStyle = "#ffffff";
+  ctx.font = `bold ${13 * scale}px Arial`;
+  ctx.fillText(`Nama: ${user.nama}`, textX, textY);
 
-// Baris 4: GPS
-textY += 20 * scale;
-ctx.fillStyle = "#4ade80";
-ctx.font = `${12 * scale}px Courier New`;
-ctx.fillText(`GPS: ${currentLocation.lat}, ${currentLocation.long}`, textX, textY);
+  textY += 20 * scale;
+  ctx.fillStyle = "#4ade80";
+  ctx.font = `${12 * scale}px Courier New`;
+  ctx.fillText(`GPS: ${currentLocation.lat}, ${currentLocation.long}`, textX, textY);
 
   const fotoBase64 = canvas.toDataURL('image/jpeg', 0.75);
   closeCam();
@@ -850,6 +848,11 @@ function startTimemark() {
 // REKAP PAGE
 // ============================================
 function renderRekap() {
+  const monthOptions = generateMonthOptions();
+  const currentMonthKey = getCurrentMonthKey();
+  
+  if (!selectedMonth) selectedMonth = currentMonthKey;
+
   return `
   <div class="space-y-4">
     <div class="flex justify-between items-center">
@@ -860,7 +863,15 @@ function renderRekap() {
     </div>
 
     <div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow">
-      <p class="text-sm text-gray-500 dark:text-gray-400 mb-3">Bulan: ${new Date().toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}</p>
+      <label class="text-xs font-bold text-red-800 block mb-2">Pilih Bulan</label>
+      <select id="monthSelector" onchange="changeMonth(this.value)" 
+        class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border-2 border-gray-200 dark:border-gray-600 rounded-xl text-sm focus:border-red-800 outline-none dark:text-white font-semibold">
+        ${monthOptions}
+      </select>
+    </div>
+
+    <div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow">
+      <p class="text-sm text-gray-500 dark:text-gray-400 mb-3" id="rekapMonthLabel">Bulan: ${getMonthName(selectedMonth)}</p>
       <div class="grid grid-cols-3 gap-3 text-center">
         <div class="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg">
           <p class="text-2xl font-bold text-green-600" id="totalHadir">-</p>
@@ -889,24 +900,100 @@ function renderRekap() {
   </div>`;
 }
 
-async function loadRekap() {
+function generateMonthOptions() {
+  const months = [];
+  const monthNames = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 
+                      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+  
+  const startDate = new Date(2026, 5, 1);
+  const currentDate = new Date();
+  const endDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 2, 1);
+  
+  let current = new Date(startDate);
+  
+  while (current <= endDate) {
+    const month = String(current.getMonth() + 1).padStart(2, '0');
+    const year = current.getFullYear();
+    const key = `${month}_${year}`;
+    const label = `${monthNames[current.getMonth()]} ${year}`;
+    
+    months.push(`<option value="${key}" ${selectedMonth === key ? 'selected' : ''}>${label}</option>`);
+    current.setMonth(current.getMonth() + 1);
+  }
+  
+  return months.join('');
+}
+
+function getCurrentMonthKey() {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const year = now.getFullYear();
+  return `${month}_${year}`;
+}
+
+function getMonthName(monthKey) {
+  const [month, year] = monthKey.split('_');
+  const monthNames = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 
+                      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+  return `${monthNames[parseInt(month) - 1]} ${year}`;
+}
+
+function changeMonth(monthKey) {
+  selectedMonth = monthKey;
+  
+  const labelEl = document.getElementById('rekapMonthLabel');
+  if (labelEl) {
+    labelEl.textContent = `Bulan: ${getMonthName(monthKey)}`;
+  }
+  
+  const selectEl = document.getElementById('monthSelector');
+  if (selectEl) {
+    selectEl.value = monthKey;
+  }
+  
+  loadRekap(monthKey);
+}
+
+async function loadRekap(monthKey = null) {
   const listEl = document.getElementById('listRekap');
-  if (listEl) listEl.innerHTML = '<div class="text-center text-gray-400 py-8"><i class="fa-solid fa-spinner fa-spin text-3xl mb-2"></i><p class="text-sm">Loading...</p></div>';
+  if (!listEl) return;
+  
+  const month = monthKey || selectedMonth || getCurrentMonthKey();
+  
+  listEl.innerHTML = `
+    <div class="text-center text-gray-400 py-8">
+      <i class="fa-solid fa-spinner fa-spin text-3xl mb-2"></i>
+      <p class="text-sm">Memuat data...</p>
+    </div>`;
+  
+  document.getElementById('totalHadir').textContent = '-';
+  document.getElementById('totalIzin').textContent = '-';
+  document.getElementById('totalAlpha').textContent = '-';
 
   try {
-    const res = await api('getRekap', { username: user.username });
+    const bulanParam = month.replace('_', '/');
+    
+    const res = await api('getRekap', { 
+      username: user.username,
+      bulan: bulanParam
+    });
 
     if (res.status === 'success') {
       dataRekap = res.data || [];
 
       let hadir = 0;
+      let izin = 0;
+      let alpha = 0;
+      
       dataRekap.forEach(r => {
         if (r.keterangan === 'IN' && r.jam && r.jam !== '--:--') hadir++;
+        if (r.keterangan === 'IZIN') izin++;
+        if (r.keterangan === 'ALPHA') alpha++;
       });
 
-      document.getElementById('totalHadir').textContent = hadir;
-      document.getElementById('totalIzin').textContent = 0;
-      document.getElementById('totalAlpha').textContent = 0;
+      animateValue('totalHadir', 0, hadir, 500);
+      animateValue('totalIzin', 0, izin, 500);
+      animateValue('totalAlpha', 0, alpha, 500);
 
       if (dataRekap.length > 0) {
         const grouped = {};
@@ -917,24 +1004,38 @@ async function loadRekap() {
           grouped[tglKey].push(r);
         });
 
-        const last7Keys = Object.keys(grouped).sort().slice(-7).reverse();
+        const sortedKeys = Object.keys(grouped).sort().reverse();
 
-        listEl.innerHTML = last7Keys.map(key => {
+        listEl.innerHTML = sortedKeys.map(key => {
           const records = grouped[key];
           const masuk = records.find(r => r.keterangan === 'IN');
           const pulang = records.find(r => r.keterangan === 'OUT');
+          const izinRecord = records.find(r => r.keterangan === 'IZIN');
+          const alphaRecord = records.find(r => r.keterangan === 'ALPHA');
 
           const tglObj = new Date(records[0].tanggal + 'T00:00:00');
           const tglFormat = tglObj.toLocaleDateString('id-ID', {
             weekday: 'short', day: '2-digit', month: 'short'
           });
 
-          return `
-            <div class="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-              <p class="text-xs font-bold text-gray-600 dark:text-gray-400 mb-2">${tglFormat}</p>
+          let statusHtml = '';
+          if (izinRecord) {
+            statusHtml = `
+              <div class="flex items-center gap-2 text-yellow-600 dark:text-yellow-400">
+                <i class="fa-solid fa-circle-check"></i>
+                <span class="text-sm font-semibold">Izin</span>
+              </div>`;
+          } else if (alphaRecord) {
+            statusHtml = `
+              <div class="flex items-center gap-2 text-red-600 dark:text-red-400">
+                <i class="fa-solid fa-circle-xmark"></i>
+                <span class="text-sm font-semibold">Alpha</span>
+              </div>`;
+          } else {
+            statusHtml = `
               <div class="flex justify-between items-center mb-1">
                 <div class="flex items-center gap-2">
-                  <div class="w-8 h-8 bg-green-100 text-green-600 rounded-lg flex items-center justify-center">
+                  <div class="w-8 h-8 bg-green-100 dark:bg-green-900/30 text-green-600 rounded-lg flex items-center justify-center">
                     <i class="fa-solid fa-sign-in-alt text-xs"></i>
                   </div>
                   <span class="text-sm text-gray-700 dark:text-gray-300">Masuk</span>
@@ -943,13 +1044,19 @@ async function loadRekap() {
               </div>
               <div class="flex justify-between items-center">
                 <div class="flex items-center gap-2">
-                  <div class="w-8 h-8 bg-red-100 text-red-600 rounded-lg flex items-center justify-center">
+                  <div class="w-8 h-8 bg-red-100 dark:bg-red-900/30 text-red-600 rounded-lg flex items-center justify-center">
                     <i class="fa-solid fa-sign-out-alt text-xs"></i>
                   </div>
                   <span class="text-sm text-gray-700 dark:text-gray-300">Pulang</span>
                 </div>
                 <p class="text-sm font-bold text-gray-800 dark:text-white">${pulang?.jam || '--:--'}</p>
-              </div>
+              </div>`;
+          }
+
+          return `
+            <div class="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg transition hover:shadow-md">
+              <p class="text-xs font-bold text-gray-600 dark:text-gray-400 mb-2">${tglFormat}</p>
+              ${statusHtml}
             </div>
           `;
         }).join('');
@@ -958,6 +1065,7 @@ async function loadRekap() {
           <div class="text-center text-gray-400 py-8">
             <i class="fa-solid fa-calendar-xmark text-3xl mb-2"></i>
             <p class="text-sm">Belum ada data absensi</p>
+            <p class="text-xs mt-1">untuk bulan ${getMonthName(month)}</p>
           </div>
         `;
       }
@@ -971,9 +1079,39 @@ async function loadRekap() {
         <i class="fa-solid fa-circle-exclamation text-3xl mb-2"></i>
         <p class="text-sm">Gagal memuat data</p>
         <p class="text-xs mt-1">${err.message}</p>
+        <button onclick="loadRekap('${month}')" class="mt-3 text-xs bg-red-800 text-white px-3 py-1 rounded">
+          <i class="fa-solid fa-refresh mr-1"></i>Coba Lagi
+        </button>
       </div>
     `;
   }
+}
+
+function animateValue(id, start, end, duration) {
+  const obj = document.getElementById(id);
+  if (!obj) return;
+  
+  const range = end - start;
+  const minTimer = 50;
+  let stepTime = Math.abs(Math.floor(duration / range));
+  stepTime = Math.max(stepTime, minTimer);
+  
+  let startTime = new Date().getTime();
+  let endTime = startTime + duration;
+  let timer;
+  
+  function run() {
+    let now = new Date().getTime();
+    let remaining = Math.max((endTime - now) / duration, 0);
+    let value = Math.round(end - (remaining * range));
+    obj.textContent = value;
+    if (value == end) {
+      clearInterval(timer);
+    }
+  }
+  
+  timer = setInterval(run, stepTime);
+  run();
 }
 
 // ============================================
@@ -1463,6 +1601,9 @@ async function api(action, data = {}) {
   try {
     const res = await fetch(URL_GAS, {
       method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify({ action, ...data })
     });
     return await res.json();
