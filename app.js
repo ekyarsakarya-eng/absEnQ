@@ -981,23 +981,24 @@ function changeMonth(monthKey) {
 async function loadRekap(monthKey = null) {
   const listEl = document.getElementById('listRekap');
   if (!listEl) return;
-  
+
   const month = monthKey || selectedMonth || getCurrentMonthKey();
-  
+
   listEl.innerHTML = `
-    <div class="text-center text-gray-400 py-8">
-      <i class="fa-solid fa-spinner fa-spin text-3xl mb-2"></i>
-      <p class="text-sm">Memuat data...</p>
-    </div>`;
-  
-  document.getElementById('totalHadir').textContent = '-';
-  document.getElementById('totalIzin').textContent = '-';
-  document.getElementById('totalAlpha').textContent = '-';
+    <div class="loading-state">
+      <div class="spinner"></div>
+      <p>Memuat data...</p>
+    </div>
+  `;
+
+  document.getElementById('totalHadir').textContent = '0';
+  document.getElementById('totalIzin').textContent = '0';
+  document.getElementById('totalAlpha').textContent = '0';
 
   try {
     const bulanParam = month.replace('_', '/');
-    
-    const res = await api('getRekapFromSheetBulanan', { 
+
+    const res = await api('getRekapFromSheetBulanan', {
       username: user.username,
       bulan: bulanParam
     });
@@ -1005,80 +1006,118 @@ async function loadRekap(monthKey = null) {
     if (res.status === 'success') {
       dataRekap = res.data || [];
 
-      let hadir = 0;
-      let izin = 0;
-      let alpha = 0;
-      
-      dataRekap.forEach(r => {
-        if (r.keterangan === 'IN' && r.jam && r.jam !== '--:--') hadir++;
-        if (r.keterangan === 'IZIN') izin++;
-        if (r.keterangan === 'ALPHA') alpha++;
+      // Group data by tanggal
+      const groupedData = {};
+      let totalHadir = 0;
+      let totalIzin = 0;
+      let totalAlpha = 0;
+
+      dataRekap.forEach(item => {
+        const tgl = item.tanggal;
+        
+        if (!groupedData[tgl]) {
+          groupedData[tgl] = {
+            tanggal: tgl,
+            jamMasuk: null,
+            jamPulang: null,
+            keterangan: null
+          };
+        }
+
+        if (item.keterangan === 'IN') {
+          groupedData[tgl].jamMasuk = item.jam;
+        } else if (item.keterangan === 'OUT') {
+          groupedData[tgl].jamPulang = item.jam;
+        }
       });
 
-      animateValue('totalHadir', 0, hadir, 500);
-      animateValue('totalIzin', 0, izin, 500);
-      animateValue('totalAlpha', 0, alpha, 500);
+      // Hitung statistik
+      Object.values(groupedData).forEach(data => {
+        if (data.jamMasuk && data.jamPulang) {
+          totalHadir++;
+        } else if (data.jamMasuk && !data.jamPulang) {
+          // Masih ada yang belum pulang (shift terbuka)
+          totalHadir++;
+        }
+      });
 
-      if (dataRekap.length > 0) {
-        // Group by date
-        const grouped = {};
-        dataRekap.forEach(r => {
-          const d = new Date(r.tanggal + 'T00:00:00');
-          const tglKey = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
-          if (!grouped[tglKey]) grouped[tglKey] = { tanggal: r.tanggal };
-          if (r.keterangan === 'IN') grouped[tglKey].masuk = r.jam;
-          if (r.keterangan === 'OUT') grouped[tglKey].pulang = r.jam;
-        });
+      // Update counter dengan animasi
+      document.getElementById('totalHadir').textContent = totalHadir;
+      document.getElementById('totalIzin').textContent = totalIzin;
+      document.getElementById('totalAlpha').textContent = totalAlpha;
 
-        const sortedKeys = Object.keys(grouped).sort().reverse();
-
-        listEl.innerHTML = `
-          <div class="overflow-x-auto">
-            <table class="w-full text-sm">
-              <thead class="bg-gray-100 dark:bg-gray-700">
+      // Tampilkan tabel
+      if (Object.keys(groupedData).length > 0) {
+        const sortedDates = Object.keys(groupedData).sort().reverse();
+        
+        let tableHTML = `
+          <div class="table-responsive">
+            <table class="attendance-table">
+              <thead>
                 <tr>
-                  <th class="text-left p-3 font-semibold text-gray-700 dark:text-gray-300">Tanggal</th>
-                  <th class="text-center p-3 font-semibold text-green-700 dark:text-green-400">Jam Masuk</th>
-                  <th class="text-center p-3 font-semibold text-red-700 dark:text-red-400">Jam Pulang</th>
+                  <th>No</th>
+                  <th>Tanggal</th>
+                  <th>Jam Masuk</th>
+                  <th>Jam Pulang</th>
+                  <th>Status</th>
                 </tr>
               </thead>
-              <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
-                ${sortedKeys.map(key => {
-                  const data = grouped[key];
-                  const tglObj = new Date(data.tanggal + 'T00:00:00');
-                  const tglFormat = tglObj.toLocaleDateString('id-ID', {
-                    weekday: 'short',
-                    day: '2-digit',
-                    month: 'short',
-                    year: 'numeric'
-                  });
+              <tbody>
+        `;
 
-                  return `
-                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-800">
-                      <td class="p-3 text-gray-700 dark:text-gray-300 font-medium">${tglFormat}</td>
-                      <td class="p-3 text-center">
-                        <span class="${data.masuk ? 'text-green-600 dark:text-green-400 font-semibold' : 'text-gray-400'}">
-                          ${data.masuk || '-'}
-                        </span>
-                      </td>
-                      <td class="p-3 text-center">
-                        <span class="${data.pulang ? 'text-red-600 dark:text-red-400 font-semibold' : 'text-gray-400'}">
-                          ${data.pulang || '-'}
-                        </span>
-                      </td>
-                    </tr>
-                  `;
-                }).join('')}
+        sortedDates.forEach((tgl, index) => {
+          const data = groupedData[tgl];
+          const tglObj = new Date(data.tanggal + 'T00:00:00');
+          const tglFormat = tglObj.toLocaleDateString('id-ID', {
+            weekday: 'long',
+            day: '2-digit',
+            month: 'long',
+            year: 'numeric'
+          });
+
+          let status = '-';
+          let statusClass = '';
+          
+          if (data.jamMasuk && data.jamPulang) {
+            status = 'Hadir';
+            statusClass = 'status-hadir';
+          } else if (data.jamMasuk && !data.jamPulang) {
+            status = 'Belum Pulang';
+            statusClass = 'status-belum-pulang';
+          } else if (!data.jamMasuk && !data.jamPulang) {
+            status = 'Alpha';
+            statusClass = 'status-alpha';
+          }
+
+          tableHTML += `
+            <tr>
+              <td>${index + 1}</td>
+              <td>${tglFormat}</td>
+              <td>${data.jamMasuk || '-'}</td>
+              <td>${data.jamPulang || '-'}</td>
+              <td><span class="status-badge ${statusClass}">${status}</span></td>
+            </tr>
+          `;
+        });
+
+        tableHTML += `
               </tbody>
             </table>
           </div>
         `;
+
+        listEl.innerHTML = tableHTML;
       } else {
         listEl.innerHTML = `
-          <div class="text-center text-gray-400 py-8">
-            <i class="fa-solid fa-calendar-xmark text-3xl mb-2"></i>
-            <p class="text-sm">Belum ada data absensi</p>
-            <p class="text-xs mt-1">untuk bulan ${getMonthName(month)}</p>
+          <div class="empty-state">
+            <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+              <line x1="16" y1="2" x2="16" y2="6"></line>
+              <line x1="8" y1="2" x2="8" y2="6"></line>
+              <line x1="3" y1="10" x2="21" y2="10"></line>
+            </svg>
+            <h3>Belum ada data absensi</h3>
+            <p>untuk bulan ${getMonthName(month)}</p>
           </div>
         `;
       }
@@ -1088,18 +1127,19 @@ async function loadRekap(monthKey = null) {
   } catch (err) {
     console.error('Load rekap error:', err);
     listEl.innerHTML = `
-      <div class="text-center text-red-400 py-8">
-        <i class="fa-solid fa-circle-exclamation text-3xl mb-2"></i>
-        <p class="text-sm">Gagal memuat data</p>
-        <p class="text-xs mt-1">${err.message}</p>
-        <button onclick="loadRekap('${month}')" class="mt-3 text-xs bg-red-800 text-white px-3 py-1 rounded">
-          <i class="fa-solid fa-refresh mr-1"></i>Coba Lagi
-        </button>
+      <div class="error-state">
+        <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="8" x2="12" y2="12"></line>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+        <h3>Gagal memuat data</h3>
+        <p>${err.message}</p>
+        <button onclick="loadRekap('${month}')" class="btn-retry">Coba Lagi</button>
       </div>
     `;
   }
 }
-
 function animateValue(id, start, end, duration) {
   const obj = document.getElementById(id);
   if (!obj) return;
