@@ -1,7 +1,7 @@
 // ============================================
 // KONFIGURASI & VARIABEL GLOBAL
 // ============================================
-const URL_GAS = 'https://script.google.com/macros/s/AKfycbwhHB4MHkTbaB41PKT82eKix2rxz-j8VvEr2gidQJWMFGVFd4TvylqqxWu3x8HWyhXI/exec';
+const URL_GAS = 'https://script.google.com/macros/s/AKfycbzCy0IA8NAf2m9Bd90QNAEmIwVi_euT37Ut0_-hlZKk563vtpV3xVV0GFIHMbswsSny/exec';
 console.log('🚀 App.js loaded - v1.1 with Rekap Monthly');
 
 // Debug connection
