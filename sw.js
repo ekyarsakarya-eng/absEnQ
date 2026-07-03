@@ -1,20 +1,15 @@
-const CACHE_NAME = 'absEnQ-v1';
+const CACHE_NAME = 'absensi-blkt-v1';
 const urlsToCache = [
-  './',
-  './index.html',
-  './app.js',
-  './manifest.json',
-  './icon-192.png',
-  './icon-512.png',
-  'https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css',
-  'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css'
+  '/absensi-absEnQ/',
+  '/absensi-absEnQ/app.js',
+  '/absensi-absEnQ/icon-192.png',
+  '/absensi-absEnQ/icon-512.png',
+  '/absensi-absEnQ/manifest.json'
 ];
 
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(urlsToCache))
-      .catch(err => console.log('Cache gagal:', err))
+    caches.open(CACHE_NAME).then(cache => cache.addAll(urlsToCache))
   );
   self.skipWaiting();
 });
@@ -22,32 +17,17 @@ self.addEventListener('install', event => {
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys => Promise.all(
-      keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
-    ))
+      keys.map(key => {
+        if (key!== CACHE_NAME) return caches.delete(key);
+      })
+    )).then(() => clients.claim())
   );
-  self.clients.claim();
 });
 
 self.addEventListener('fetch', event => {
-  const url = new URL(event.request.url);
-  
-  // JANGAN PERNAH cache API Google Apps Script - harus live
-  if (url.hostname.includes('script.google.com')) {
-    return;
-  }
-  
-  if (event.request.method !== 'GET') return;
-
   event.respondWith(
-    caches.match(event.request).then(cached => {
-      return cached || fetch(event.request).then(response => {
-        // cache hanya file lokal kamu
-        if (response.ok && url.origin === location.origin) {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then(c => c.put(event.request, clone));
-        }
-        return response;
-      }).catch(() => caches.match('./index.html'));
+    caches.match(event.request).then(response => {
+      return response || fetch(event.request);
     })
   );
 });
