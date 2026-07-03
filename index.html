@@ -1,80 +1,391 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Absensi Karyawan absEnQ</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Absensi Karyawan absEnQ</title>
 
-  <!-- PWA Manifest - Pastikan path benar -->
-  <link rel="manifest" href="./manifest.json">
-  <meta name="theme-color" content="#800000">
+<!-- PWA Manifest -->
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#800000">
 
-  <!-- Icons -->
-  <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
-  <link rel="apple-touch-icon" href="./icon-192.png">
+<!-- Icons -->
+<link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
+<link rel="apple-touch-icon" href="./icon-192.png">
 
-  <!-- iOS PWA Support -->
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Absensi">
-  <meta name="mobile-web-app-capable" content="yes">
+<!-- iOS PWA Support -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Absensi">
+<meta name="mobile-web-app-capable" content="yes">
 
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      darkMode: 'class',
-      theme: {
-        extend: {
-          colors: {
-            'maroon': '#800000',
-            'maroon-dark': '#5c0000',
-          }
-        }
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  darkMode: 'class',
+  theme: {
+    extend: {
+      colors: {
+        'maroon': '#800000',
+        'maroon-dark': '#5c0000',
       }
     }
-  </script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <style>
-    video, #canvas { object-fit: cover; }
-    * { -webkit-tap-highlight-color: transparent; }
-  </style>
-</head>
-<body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white transition">
-  <div id="app"></div>
+  }
+}
+</script>
 
-  <!-- POPUP INSTALL PWA -->
-  <div id="installPopup" class="fixed inset-0 bg-black/90 backdrop-blur-sm hidden items-center justify-center p-4 z-[999]">
-    <div class="bg-white dark:bg-gray-800 rounded-3xl p-6 w-full max-w-sm text-center shadow-2xl">
-      <div class="w-20 h-20 bg-red-800 rounded-3xl mx-auto flex items-center justify-center mb-4 animate-bounce">
-        <i class="fa-solid fa-download text-white text-3xl"></i>
-      </div>
-      <h3 class="text-xl font-black text-gray-900 dark:text-white mb-2">Install Aplikasi</h3>
-      <p class="text-sm text-gray-600 dark:text-gray-400 mb-6">Install aplikasi untuk pengalaman yang lebih baik</p>
-      <button id="btnInstallAndroid" class="w-full bg-red-800 hover:bg-red-900 text-white py-4 rounded-2xl font-bold text-lg shadow-xl transition">
-        <i class="fa-solid fa-download mr-2"></i>Install Sekarang
-      </button>
-      <p class="text-xs text-gray-500 mt-4">Gratis • 2MB</p>
-    </div>
-  </div>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-  <!-- Load app.js -->
-  <script src="./app.js"></script>
-
-  <!-- Modal Zoom -->
-  <div id="modalZoom" class="fixed inset-0 bg-black/90 hidden items-center justify-center p-4 z-[9999]" onclick="tutupZoom()">
-    <button class="absolute top-5 right-5 w-11 h-11 bg-white/20 rounded-full text-white text-3xl">&times;</button>
-    <img id="imgZoom" class="max-w-full max-h-[90vh] rounded-2xl" onclick="event.stopPropagation()">
-  </div>
+<style>
+  video, #canvas { object-fit: cover; }
+  * { -webkit-tap-highlight-color: transparent; }
   
-  <script>
-    function bukaZoom(url) {
-      document.getElementById('imgZoom').src = url;
-      document.getElementById('modalZoom').classList.remove('hidden');
-      document.getElementById('modalZoom').classList.add('flex');
+  /* ==================== REKAP ABSENSI STYLES ==================== */
+  
+  /* Table Container */
+  .table-responsive {
+    overflow-x: auto;
+    margin-top: 1rem;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* Attendance Table */
+  .attendance-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  }
+  
+  .dark .attendance-table {
+    background: #1f2937;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  }
+  
+  /* Table Header */
+  .attendance-table thead {
+    background: linear-gradient(135deg, #800000 0%, #5c0000 100%);
+    color: white;
+  }
+  
+  .attendance-table th {
+    padding: 14px 16px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  
+  /* Table Body */
+  .attendance-table td {
+    padding: 14px 16px;
+    border-bottom: 1px solid #e5e7eb;
+    font-size: 14px;
+  }
+  
+  .dark .attendance-table td {
+    border-bottom: 1px solid #374151;
+    color: #e5e7eb;
+  }
+  
+  .attendance-table tbody tr {
+    transition: background-color 0.2s ease;
+  }
+  
+  .attendance-table tbody tr:hover {
+    background-color: #f9fafb;
+  }
+  
+  .dark .attendance-table tbody tr:hover {
+    background-color: #374151;
+  }
+  
+  .attendance-table tbody tr:last-child td {
+    border-bottom: none;
+  }
+  
+  /* Status Badges */
+  .status-badge {
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    display: inline-block;
+    text-align: center;
+    min-width: 100px;
+  }
+  
+  .status-hadir {
+    background: #d1fae5;
+    color: #065f46;
+  }
+  
+  .dark .status-hadir {
+    background: #064e3b;
+    color: #6ee7b7;
+  }
+  
+  .status-belum-pulang {
+    background: #fef3c7;
+    color: #92400e;
+  }
+  
+  .dark .status-belum-pulang {
+    background: #78350f;
+    color: #fcd34d;
+  }
+  
+  .status-alpha {
+    background: #fee2e2;
+    color: #991b1b;
+  }
+  
+  .dark .status-alpha {
+    background: #7f1d1d;
+    color: #fca5a5;
+  }
+  
+  .status-izin {
+    background: #dbeafe;
+    color: #1e40af;
+  }
+  
+  .dark .status-izin {
+    background: #1e3a8a;
+    color: #93c5fd;
+  }
+  
+  /* Empty & Error States */
+  .empty-state,
+  .error-state,
+  .loading-state {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: #6b7280;
+  }
+  
+  .dark .empty-state,
+  .dark .error-state,
+  .dark .loading-state {
+    color: #9ca3af;
+  }
+  
+  .empty-state svg,
+  .error-state svg,
+  .loading-state svg {
+    margin: 0 auto 1rem;
+    opacity: 0.5;
+  }
+  
+  .empty-state h3,
+  .error-state h3 {
+    margin: 0.5rem 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #111827;
+  }
+  
+  .dark .empty-state h3,
+  .dark .error-state h3 {
+    color: #f9fafb;
+  }
+  
+  .empty-state p,
+  .error-state p {
+    margin: 0.5rem 0;
+    color: #9ca3af;
+  }
+  
+  /* Retry Button */
+  .btn-retry {
+    margin-top: 1rem;
+    padding: 10px 28px;
+    background: linear-gradient(135deg, #800000 0%, #5c0000 100%);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.2s;
+    box-shadow: 0 4px 8px rgba(128, 0, 0, 0.2);
+  }
+  
+  .btn-retry:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(128, 0, 0, 0.3);
+  }
+  
+  .btn-retry:active {
+    transform: translateY(0);
+  }
+  
+  /* Loading Spinner */
+  .spinner {
+    border: 4px solid #f3f4f6;
+    border-top: 4px solid #800000;
+    border-radius: 50%;
+    width: 48px;
+    height: 48px;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 1rem;
+  }
+  
+  .dark .spinner {
+    border: 4px solid #374151;
+    border-top: 4px solid #800000;
+  }
+  
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+  
+  /* Summary Cards */
+  .summary-cards {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+  
+  .summary-card {
+    background: white;
+    border-radius: 12px;
+    padding: 1rem;
+    text-align: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    transition: transform 0.2s;
+  }
+  
+  .dark .summary-card {
+    background: #1f2937;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  }
+  
+  .summary-card:hover {
+    transform: translateY(-2px);
+  }
+  
+  .summary-card .number {
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 0.25rem;
+  }
+  
+  .summary-card .label {
+    font-size: 0.875rem;
+    color: #6b7280;
+    font-weight: 500;
+  }
+  
+  .dark .summary-card .label {
+    color: #9ca3af;
+  }
+  
+  .summary-card.hadir .number { color: #059669; }
+  .summary-card.izin .number { color: #2563eb; }
+  .summary-card.alpha .number { color: #dc2626; }
+  
+  /* Month Selector */
+  .month-selector {
+    background: white;
+    border-radius: 12px;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  }
+  
+  .dark .month-selector {
+    background: #1f2937;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  }
+  
+  .month-selector select {
+    width: 100%;
+    padding: 10px 14px;
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    background: white;
+    cursor: pointer;
+    transition: border-color 0.2s;
+  }
+  
+  .dark .month-selector select {
+    background: #374151;
+    border-color: #4b5563;
+    color: #e5e7eb;
+  }
+  
+  .month-selector select:focus {
+    outline: none;
+    border-color: #800000;
+  }
+  
+  /* Responsive */
+  @media (max-width: 640px) {
+    .attendance-table th,
+    .attendance-table td {
+      padding: 10px 12px;
+      font-size: 13px;
     }
-    function tutupZoom() {
-      document.getElementById('modalZoom').classList.add('hidden');
+    
+    .summary-cards {
+      grid-template-columns: 1fr;
     }
-  </script>
+    
+    .status-badge {
+      min-width: 80px;
+      padding: 4px 10px;
+      font-size: 11px;
+    }
+  }
+</style>
+</head>
+
+<body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white transition">
+
+<div id="app"></div>
+
+<!-- POPUP INSTALL PWA -->
+<div id="installPopup" class="fixed inset-0 bg-black/90 backdrop-blur-sm hidden items-center justify-center p-4 z-[999]">
+  <div class="bg-white dark:bg-gray-800 rounded-3xl p-6 w-full max-w-sm text-center shadow-2xl">
+    <div class="w-20 h-20 bg-red-800 rounded-3xl mx-auto flex items-center justify-center mb-4 animate-bounce">
+      <i class="fa-solid fa-download text-white text-3xl"></i>
+    </div>
+    <h3 class="text-xl font-black text-gray-900 dark:text-white mb-2">Install Aplikasi</h3>
+    <p class="text-sm text-gray-600 dark:text-gray-400 mb-6">Install aplikasi untuk pengalaman yang lebih baik</p>
+    <button id="btnInstallAndroid" class="w-full bg-red-800 hover:bg-red-900 text-white py-4 rounded-2xl font-bold text-lg shadow-xl transition">
+      <i class="fa-solid fa-download mr-2"></i>Install Sekarang
+    </button>
+    <p class="text-xs text-gray-500 mt-4">Gratis • 2MB</p>
+  </div>
+</div>
+
+<!-- Load app.js -->
+<script src="./app.js"></script>
+
+<!-- Modal Zoom -->
+<div id="modalZoom" class="fixed inset-0 bg-black/90 hidden items-center justify-center p-4 z-[9999]" onclick="tutupZoom()">
+  <button class="absolute top-5 right-5 w-11 h-11 bg-white/20 rounded-full text-white text-3xl">&times;</button>
+  <img id="imgZoom" class="max-w-full max-h-[90vh] rounded-2xl" onclick="event.stopPropagation()">
+</div>
+
+<script>
+function bukaZoom(url) {
+  document.getElementById('imgZoom').src = url;
+  document.getElementById('modalZoom').classList.remove('hidden');
+  document.getElementById('modalZoom').classList.add('flex');
+}
+
+function tutupZoom() {
+  document.getElementById('modalZoom').classList.add('hidden');
+}
+</script>
+
 </body>
 </html>
