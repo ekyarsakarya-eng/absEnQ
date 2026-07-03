@@ -233,19 +233,19 @@ function renderDashboard() {
         <span class="text-xs font-semibold">Home</span>
       </button>
       <button onclick="switchPage('rekap')" class="flex flex-col items-center py-2 ${currentPage === 'rekap' ? 'text-red-800' : 'text-gray-500'}">
-        <img src="https://raw.githubusercontent.com/ekyarsakarya-eng/absensi-Balaikota/main/icon-rekap.png" class="w-6 h-6 mb-1 ${currentPage === 'rekap' ? '' : 'opacity-50'}">
+        <img src="https://raw.githubusercontent.com/ekyarsakarya-eng/absensi-absEnQ/main/icon-rekap.png" class="w-6 h-6 mb-1 ${currentPage === 'rekap' ? '' : 'opacity-50'}">
         <span class="text-xs font-semibold">Rekap</span>
       </button>
       <button onclick="switchPage('patroli')" class="flex flex-col items-center py-2 ${currentPage === 'patroli' ? 'text-red-800' : 'text-gray-500'}">
-        <img src="https://raw.githubusercontent.com/ekyarsakarya-eng/absensi-Balaikota/main/icon-patroli.png" class="w-6 h-6 mb-1 ${currentPage === 'patroli' ? '' : 'opacity-50'}">
+        <img src="https://raw.githubusercontent.com/ekyarsakarya-eng/absensi-absEnQ/main/icon-patroli.png" class="w-6 h-6 mb-1 ${currentPage === 'patroli' ? '' : 'opacity-50'}">
         <span class="text-xs font-semibold">Patroli</span>
       </button>
       <button onclick="switchPage('kejadian')" class="flex flex-col items-center py-2 ${currentPage === 'kejadian' ? 'text-red-800' : 'text-gray-500'}">
-        <img src="https://raw.githubusercontent.com/ekyarsakarya-eng/absensi-Balaikota/main/icon-kejadian.png" class="w-6 h-6 mb-1 ${currentPage === 'kejadian' ? '' : 'opacity-50'}">
+        <img src="https://raw.githubusercontent.com/ekyarsakarya-eng/absensi-absEnQ/main/icon-kejadian.png" class="w-6 h-6 mb-1 ${currentPage === 'kejadian' ? '' : 'opacity-50'}">
         <span class="text-xs font-semibold">Kejadian</span>
       </button>
       <button onclick="switchPage('pembinaan')" class="flex flex-col items-center py-2 ${currentPage === 'pembinaan' ? 'text-red-800' : 'text-gray-500'}">
-        <img src="https://raw.githubusercontent.com/ekyarsakarya-eng/absensi-Balaikota/main/icon-pembinaan.png" class="w-6 h-6 mb-1 ${currentPage === 'pembinaan' ? '' : 'opacity-50'}">
+        <img src="https://raw.githubusercontent.com/ekyarsakarya-eng/absensi-absEnQ/main/icon-pembinaan.png" class="w-6 h-6 mb-1 ${currentPage === 'pembinaan' ? '' : 'opacity-50'}">
         <span class="text-xs font-semibold">Pembinaan</span>
       </button>
     </div>
@@ -1625,15 +1625,22 @@ async function cekStatus() {
 
 async function api(action, data = {}) {
   try {
-    const res = await fetch(URL_GAS, {
+    // Tambahkan timestamp untuk bypass cache
+    const url = URL_GAS + '?t=' + Date.now();
+    
+    const res = await fetch(url, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      // JANGAN gunakan headers Content-Type - GAS akan otomatis parse
       body: JSON.stringify({ action, ...data })
     });
+    
+    if (!res.ok) {
+      throw new Error('HTTP error! status: ' + res.status);
+    }
+    
     return await res.json();
   } catch (e) {
+    console.error('API Error:', e);
     toast('Koneksi gagal: ' + e.message);
     return { status: 'error', message: e.message };
   }
