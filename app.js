@@ -997,7 +997,6 @@ async function loadRekap(monthKey = null) {
   try {
     const bulanParam = month.replace('_', '/');
     
-    // Coba ambil dari sheet REKAP bulanan dulu
     const res = await api('getRekapFromSheetBulanan', { 
       username: user.username,
       bulan: bulanParam
@@ -1021,50 +1020,59 @@ async function loadRekap(monthKey = null) {
       animateValue('totalAlpha', 0, alpha, 500);
 
       if (dataRekap.length > 0) {
+        // Group by date
         const grouped = {};
         dataRekap.forEach(r => {
           const d = new Date(r.tanggal + 'T00:00:00');
           const tglKey = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
-          if (!grouped[tglKey]) grouped[tglKey] = [];
-          grouped[tglKey].push(r);
+          if (!grouped[tglKey]) grouped[tglKey] = { tanggal: r.tanggal };
+          if (r.keterangan === 'IN') grouped[tglKey].masuk = r.jam;
+          if (r.keterangan === 'OUT') grouped[tglKey].pulang = r.jam;
         });
 
         const sortedKeys = Object.keys(grouped).sort().reverse();
 
-        listEl.innerHTML = sortedKeys.map(key => {
-          const records = grouped[key];
-          const masuk = records.find(r => r.keterangan === 'IN');
-          const pulang = records.find(r => r.keterangan === 'OUT');
+        listEl.innerHTML = `
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead class="bg-gray-100 dark:bg-gray-700">
+                <tr>
+                  <th class="text-left p-3 font-semibold text-gray-700 dark:text-gray-300">Tanggal</th>
+                  <th class="text-center p-3 font-semibold text-green-700 dark:text-green-400">Jam Masuk</th>
+                  <th class="text-center p-3 font-semibold text-red-700 dark:text-red-400">Jam Pulang</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                ${sortedKeys.map(key => {
+                  const data = grouped[key];
+                  const tglObj = new Date(data.tanggal + 'T00:00:00');
+                  const tglFormat = tglObj.toLocaleDateString('id-ID', {
+                    weekday: 'short',
+                    day: '2-digit',
+                    month: 'short',
+                    year: 'numeric'
+                  });
 
-          const tglObj = new Date(records[0].tanggal + 'T00:00:00');
-          const tglFormat = tglObj.toLocaleDateString('id-ID', {
-            weekday: 'short', day: '2-digit', month: 'short'
-          });
-
-          return `
-            <div class="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg transition hover:shadow-md">
-              <p class="text-xs font-bold text-gray-600 dark:text-gray-400 mb-2">${tglFormat}</p>
-              <div class="flex justify-between items-center mb-1">
-                <div class="flex items-center gap-2">
-                  <div class="w-8 h-8 bg-green-100 dark:bg-green-900/30 text-green-600 rounded-lg flex items-center justify-center">
-                    <i class="fa-solid fa-sign-in-alt text-xs"></i>
-                  </div>
-                  <span class="text-sm text-gray-700 dark:text-gray-300">Masuk</span>
-                </div>
-                <p class="text-sm font-bold text-gray-800 dark:text-white">${masuk?.jam || '--:--'}</p>
-              </div>
-              <div class="flex justify-between items-center">
-                <div class="flex items-center gap-2">
-                  <div class="w-8 h-8 bg-red-100 dark:bg-red-900/30 text-red-600 rounded-lg flex items-center justify-center">
-                    <i class="fa-solid fa-sign-out-alt text-xs"></i>
-                  </div>
-                  <span class="text-sm text-gray-700 dark:text-gray-300">Pulang</span>
-                </div>
-                <p class="text-sm font-bold text-gray-800 dark:text-white">${pulang?.jam || '--:--'}</p>
-              </div>
-            </div>
-          `;
-        }).join('');
+                  return `
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-800">
+                      <td class="p-3 text-gray-700 dark:text-gray-300 font-medium">${tglFormat}</td>
+                      <td class="p-3 text-center">
+                        <span class="${data.masuk ? 'text-green-600 dark:text-green-400 font-semibold' : 'text-gray-400'}">
+                          ${data.masuk || '-'}
+                        </span>
+                      </td>
+                      <td class="p-3 text-center">
+                        <span class="${data.pulang ? 'text-red-600 dark:text-red-400 font-semibold' : 'text-gray-400'}">
+                          ${data.pulang || '-'}
+                        </span>
+                      </td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        `;
       } else {
         listEl.innerHTML = `
           <div class="text-center text-gray-400 py-8">
