@@ -1,21 +1,20 @@
 {
   "name": "Absensi Karyawan absEnQ",
   "short_name": "Absensi absEnQ",
-  "start_url": "/absensi-absEnQ/",
+  "start_url": "./",
   "display": "standalone",
   "background_color": "#800000",
   "theme_color": "#800000",
-  "scope": "/absensi-absEnQ/",
-  "id": "/absensi-absEnQ/",
+  "scope": "./",
   "icons": [
     {
-      "src": "/absensi-absEnQ/icon-192.png",
+      "src": "./icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/absensi-absEnQ/icon-512.png",
+      "src": "./icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
