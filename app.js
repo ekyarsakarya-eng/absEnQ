@@ -2,7 +2,25 @@
 // KONFIGURASI & VARIABEL GLOBAL
 // ============================================
 const URL_GAS = 'https://script.google.com/macros/s/AKfycbwhHB4MHkTbaB41PKT82eKix2rxz-j8VvEr2gidQJWMFGVFd4TvylqqxWu3x8HWyhXI/exec';
-console.log('App.js loaded - v1.0');
+console.log('🚀 App.js loaded - v1.1 with Rekap Monthly');
+
+// Debug connection
+async function testConnection() {
+  try {
+    console.log('🔍 Testing connection to GAS...');
+    const response = await fetch(URL_GAS, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'test' })
+    });
+    const data = await response.json();
+    console.log('✅ Connection OK:', data);
+  } catch (err) {
+    console.error('❌ Connection FAILED:', err);
+    console.error('❌ Error details:', err.message);
+  }
+}
+testConnection();
 
 let user = JSON.parse(localStorage.getItem('user') || 'null');
 let isDark = localStorage.getItem('dark') === 'true';
@@ -39,7 +57,6 @@ window.addEventListener('beforeinstallprompt', (e) => {
     installPopup.classList.remove('hidden');
     installPopup.classList.add('flex');
     btnAndroid.classList.remove('hidden');
-    document.getElementById('installTitle').textContent = 'Install Aplikasi Dulu';
   }
 });
 
@@ -54,25 +71,29 @@ btnAndroid?.addEventListener('click', async () => {
 if (isIOS && !isInStandalone()) {
   installPopup.classList.remove('hidden');
   installPopup.classList.add('flex');
-  btnIOS.classList.remove('hidden');
-  document.getElementById('installTitle').textContent = 'Wajib Install di iPhone';
-  document.getElementById('installDesc').textContent = 'Safari tidak bisa absen normal kalau belum di Add to Home Screen';
+  if (btnIOS) {
+    btnIOS.classList.remove('hidden');
+  }
 }
 
 btnIOS?.addEventListener('click', () => {
-  iosSteps.classList.toggle('hidden');
-  btnIOS.innerHTML = iosSteps.classList.contains('hidden')
-    ? '<i class="fa-solid fa-share-from-square mr-2"></i>Lihat Cara Install'
-    : '<i class="fa-solid fa-check mr-2"></i>Sudah Install? Buka dari Home';
+  if (iosSteps) {
+    iosSteps.classList.toggle('hidden');
+  }
+  if (btnIOS) {
+    btnIOS.innerHTML = iosSteps.classList.contains('hidden')
+      ? '<i class="fa-solid fa-share-from-square mr-2"></i>Lihat Cara Install'
+      : '<i class="fa-solid fa-check mr-2"></i>Sudah Install? Buka dari Home';
+  }
 });
 
-if (isInStandalone()) installPopup?.classList.add('hidden');
+if (isInStandalone() && installPopup) installPopup.classList.add('hidden');
 
 // ============================================
 // INIT APP
 // ============================================
 const app = document.getElementById('app');
-if (!app) console.error('Div #app tidak ditemukan!');
+if (!app) console.error('❌ Div #app tidak ditemukan!');
 if (isDark) document.documentElement.classList.add('dark');
 
 function render() {
@@ -845,7 +866,7 @@ function startTimemark() {
 }
 
 // ============================================
-// REKAP PAGE
+// REKAP PAGE - DENGAN FITUR PILIH BULAN
 // ============================================
 function renderRekap() {
   const monthOptions = generateMonthOptions();
@@ -1092,6 +1113,11 @@ function animateValue(id, start, end, duration) {
   if (!obj) return;
   
   const range = end - start;
+  if (range === 0) {
+    obj.textContent = end;
+    return;
+  }
+  
   const minTimer = 50;
   let stepTime = Math.abs(Math.floor(duration / range));
   stepTime = Math.max(stepTime, minTimer);
@@ -1627,6 +1653,6 @@ window.addEventListener('popstate', function(event) {
 // ============================================
 // INIT
 // ============================================
-console.log('Starting app...');
+console.log('🚀 Starting app...');
 history.pushState({ page: currentPage }, '', '');
 render();
