@@ -1,23 +1,65 @@
-// Service Worker - DISABLED untuk troubleshooting
-// File ini sengaja dikosongkan
+// Service Worker untuk Absensi absEnQ
+const CACHE_NAME = 'absensi-absEnQ-v1';
+const urlsToCache = [
+  './',
+  './index.html',
+  './app.js',
+  './manifest.json',
+  './icon-192.png',
+  './icon-512.png'
+];
 
-const CACHE_NAME = 'absensi-absEnQ-v1;
-
+// Install SW
 self.addEventListener('install', event => {
+  event.waitUntil(
+    caches.open(CACHE_NAME)
+      .then(cache => {
+        console.log('Cache opened');
+        return cache.addAll(urlsToCache);
+      })
+      .catch(err => console.log('Cache addAll failed:', err))
+  );
   self.skipWaiting();
 });
 
+// Activate SW
 self.addEventListener('activate', event => {
   event.waitUntil(
-    caches.keys().then(keys => Promise.all(
-      keys.map(key => caches.delete(key))
-    ))
+    caches.keys().then(cacheNames => {
+      return Promise.all(
+        cacheNames.map(cacheName => {
+          if (cacheName !== CACHE_NAME) {
+            console.log('Deleting old cache:', cacheName);
+            return caches.delete(cacheName);
+          }
+        })
+      );
+    }).then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
-// Jangan intercept request apapun
+// Fetch - Network first untuk API, cache untuk static
 self.addEventListener('fetch', event => {
-  // Biarkan semua request langsung ke network
-  return;
+  // Skip Google Apps Script calls - biarkan langsung ke network
+  if (event.request.url.includes('script.google.com')) {
+    return;
+  }
+  
+  event.respondWith(
+    fetch(event.request)
+      .then(response => {
+        // Clone response untuk cache
+        if (response.status === 200) {
+          const responseClone = response.clone();
+          caches.open(CACHE_NAME).then(cache => {
+            cache.put(event.request, responseClone);
+          });
+        }
+        return response;
+      })
+      .catch(() => {
+        // Fallback ke cache jika offline
+        return caches.match(event.request);
+      })
+  );
 });
