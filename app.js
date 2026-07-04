@@ -468,6 +468,7 @@ function renderPage() {
 
 function switchPage(page) {
   currentPage = page;
+  // Jangan simpan selectedMonth - biarkan reset ke bulan berjalan
   renderDashboard();
   history.pushState({ page: page }, '', '');
 }
@@ -914,10 +915,10 @@ function startTimemark() {
 // ============================================
 function renderRekap() {
   const monthOptions = generateMonthOptions();
-  const currentMonthKey = getCurrentMonthKey();
   
-  if (!selectedMonth) selectedMonth = currentMonthKey;
-
+  // SELALU set ke bulan berjalan saat masuk halaman Rekap
+  selectedMonth = getCurrentMonthKey();
+  
   return `
   <div class="space-y-4">
     <!-- Header -->
@@ -964,12 +965,12 @@ function renderRekap() {
     <!-- Tabel Rekap -->
     <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
       <div class="px-4 py-3 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
-  <p class="text-sm font-bold text-gray-700 dark:text-gray-200 flex items-center gap-2" id="rekapHeaderLabel">
-    <i class="fa-solid fa-table-list text-red-800"></i>
-    Riwayat Bulan ${getMonthName(selectedMonth)}
-  </p>
-  <span id="rekapCount" class="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded-full"></span>
-</div>
+        <p class="text-sm font-bold text-gray-700 dark:text-gray-200 flex items-center gap-2" id="rekapHeaderLabel">
+          <i class="fa-solid fa-table-list text-red-800"></i>
+          Riwayat Bulan ${getMonthName(selectedMonth)}
+        </p>
+        <span id="rekapCount" class="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded-full"></span>
+      </div>
       <div id="listRekap" class="p-4">
         <div class="text-center text-gray-400 py-8">
           <i class="fa-solid fa-spinner fa-spin text-3xl mb-2"></i>
@@ -997,6 +998,7 @@ function generateMonthOptions() {
     const key = `${month}_${year}`;
     const label = `${monthNames[current.getMonth()]} ${year}`;
     
+    // selectedMonth sudah di-set ke getCurrentMonthKey() di renderRekap
     months.push(`<option value="${key}" ${selectedMonth === key ? 'selected' : ''}>${label}</option>`);
     current.setMonth(current.getMonth() + 1);
   }
