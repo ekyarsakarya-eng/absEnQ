@@ -879,45 +879,60 @@ function renderRekap() {
 
   return `
   <div class="space-y-4">
+    <!-- Header -->
     <div class="flex justify-between items-center">
-      <h2 class="text-xl font-bold text-gray-800 dark:text-white">Rekap Absensi</h2>
-      <button onclick="loadRekap()" class="bg-red-800 text-white px-4 py-2 rounded-lg text-sm hover:bg-red-900 transition">
-        <i class="fa-solid fa-refresh mr-1"></i>Refresh
+      <h2 class="text-xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
+        <i class="fa-solid fa-calendar-days text-red-800"></i>
+        Rekap Absensi
+      </h2>
+      <button onclick="loadRekap()" class="bg-red-800 text-white px-4 py-2 rounded-lg text-sm hover:bg-red-900 transition shadow-sm">
+        <i class="fa-solid fa-rotate-right mr-1"></i>Refresh
       </button>
     </div>
 
-    <div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow">
-      <label class="text-xs font-bold text-red-800 block mb-2">Pilih Bulan</label>
+    <!-- Month Selector -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700">
+      <label class="text-xs font-bold text-red-800 dark:text-red-400 uppercase tracking-wide block mb-2">
+        <i class="fa-regular fa-calendar mr-1"></i> Pilih Bulan
+      </label>
       <select id="monthSelector" onchange="changeMonth(this.value)" 
-        class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border-2 border-gray-200 dark:border-gray-600 rounded-xl text-sm focus:border-red-800 outline-none dark:text-white font-semibold">
+        class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border-2 border-gray-200 dark:border-gray-600 rounded-xl text-sm focus:border-red-800 outline-none dark:text-white font-semibold cursor-pointer">
         ${monthOptions}
       </select>
     </div>
 
-    <div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow">
-      <p class="text-sm text-gray-500 dark:text-gray-400 mb-3" id="rekapMonthLabel">Bulan: ${getMonthName(selectedMonth)}</p>
-      <div class="grid grid-cols-3 gap-3 text-center">
-        <div class="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg">
-          <p class="text-2xl font-bold text-green-600" id="totalHadir">-</p>
-          <p class="text-xs text-gray-600 dark:text-gray-400">Hadir</p>
-        </div>
-        <div class="bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded-lg">
-          <p class="text-2xl font-bold text-yellow-600" id="totalIzin">-</p>
-          <p class="text-xs text-gray-600 dark:text-gray-400">Izin</p>
-        </div>
-        <div class="bg-red-50 dark:bg-red-900/20 p-3 rounded-lg">
-          <p class="text-2xl font-bold text-red-600" id="totalAlpha">-</p>
-          <p class="text-xs text-gray-600 dark:text-gray-400">Alpha</p>
-        </div>
+    <!-- Summary Cards -->
+    <div class="grid grid-cols-3 gap-3">
+      <div class="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/30 dark:to-emerald-900/20 p-4 rounded-2xl border border-green-200 dark:border-green-800 text-center shadow-sm">
+        <i class="fa-solid fa-circle-check text-green-600 dark:text-green-400 text-xl mb-1"></i>
+        <p class="text-2xl font-black text-green-700 dark:text-green-300" id="totalHadir">-</p>
+        <p class="text-[10px] text-green-600 dark:text-green-400 font-bold uppercase tracking-wider">Hadir</p>
+      </div>
+      <div class="bg-gradient-to-br from-amber-50 to-yellow-50 dark:from-amber-900/30 dark:to-yellow-900/20 p-4 rounded-2xl border border-amber-200 dark:border-amber-800 text-center shadow-sm">
+        <i class="fa-solid fa-file-signature text-amber-600 dark:text-amber-400 text-xl mb-1"></i>
+        <p class="text-2xl font-black text-amber-700 dark:text-amber-300" id="totalIzin">-</p>
+        <p class="text-[10px] text-amber-600 dark:text-amber-400 font-bold uppercase tracking-wider">Izin</p>
+      </div>
+      <div class="bg-gradient-to-br from-red-50 to-rose-50 dark:from-red-900/30 dark:to-rose-900/20 p-4 rounded-2xl border border-red-200 dark:border-red-800 text-center shadow-sm">
+        <i class="fa-solid fa-circle-xmark text-red-600 dark:text-red-400 text-xl mb-1"></i>
+        <p class="text-2xl font-black text-red-700 dark:text-red-300" id="totalAlpha">-</p>
+        <p class="text-[10px] text-red-600 dark:text-red-400 font-bold uppercase tracking-wider">Alpha</p>
       </div>
     </div>
 
-    <div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow">
-      <p class="text-sm font-bold text-gray-700 dark:text-gray-300 mb-3">Riwayat Absensi Anda</p>
-      <div class="space-y-2" id="listRekap">
+    <!-- Tabel Rekap -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
+      <div class="px-4 py-3 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
+        <p class="text-sm font-bold text-gray-700 dark:text-gray-200 flex items-center gap-2">
+          <i class="fa-solid fa-table-list text-red-800"></i>
+          <span id="rekapMonthLabel">Riwayat Bulan ${getMonthName(selectedMonth)}</span>
+        </p>
+        <span id="rekapCount" class="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded-full"></span>
+      </div>
+      <div id="listRekap" class="p-4">
         <div class="text-center text-gray-400 py-8">
           <i class="fa-solid fa-spinner fa-spin text-3xl mb-2"></i>
-          <p class="text-sm">Loading data...</p>
+          <p class="text-sm">Memuat data...</p>
         </div>
       </div>
     </div>
@@ -929,7 +944,7 @@ function generateMonthOptions() {
   const monthNames = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 
                       'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
   
-  const startDate = new Date(2026, 5, 1);
+  const startDate = new Date(2026, 5, 1); // Mulai dari Juni 2026
   const currentDate = new Date();
   const endDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 2, 1);
   
@@ -967,30 +982,32 @@ function changeMonth(monthKey) {
   
   const labelEl = document.getElementById('rekapMonthLabel');
   if (labelEl) {
-    labelEl.textContent = `Bulan: ${getMonthName(monthKey)}`;
+    labelEl.innerHTML = `<i class="fa-solid fa-table-list text-red-800"></i> Riwayat Bulan ${getMonthName(monthKey)}`;
   }
   
   const selectEl = document.getElementById('monthSelector');
-  if (selectEl) {
-    selectEl.value = monthKey;
-  }
+  if (selectEl) selectEl.value = monthKey;
   
   loadRekap(monthKey);
 }
 
 async function loadRekap(bulanKey = null) {
   const listEl = document.getElementById('listRekap');
+  const countEl = document.getElementById('rekapCount');
   
   // Gunakan parameter bulanKey atau ambil dari selector
-  const bulan = bulanKey || document.getElementById('monthSelector').value;
-  const bulanParam = bulan.replace('_', '/'); // jadi "07/2026"
+  const bulan = bulanKey || document.getElementById('monthSelector')?.value || getCurrentMonthKey();
+  const [month, year] = bulan.split('_');
+  const bulanParam = `${month}/${year}`;
 
+  // Loading state
   listEl.innerHTML = `
-    <div class="loading-state">
-      <div class="spinner"></div>
-      <p>Memuat data absensi...</p>
+    <div class="text-center py-8">
+      <div class="inline-block w-10 h-10 border-4 border-red-200 border-t-red-800 rounded-full animate-spin mb-3"></div>
+      <p class="text-sm text-gray-500 dark:text-gray-400">Memuat data absensi ${getMonthName(bulan)}...</p>
     </div>
   `;
+  if (countEl) countEl.textContent = '';
 
   try {
     const res = await api('getRekapFromSheetBulanan', {
@@ -998,116 +1015,200 @@ async function loadRekap(bulanKey = null) {
       bulan: bulanParam
     });
 
-    if (res.status !== 'success' || !res.data || res.data.length === 0) {
+    // Handle error dari backend
+    if (res.status === 'error') {
       listEl.innerHTML = `
-        <div class="empty-state">
-          <i class="fa-solid fa-calendar-xmark text-5xl mb-3 opacity-50"></i>
-          <h3>Belum Ada Data</h3>
-          <p>Belum ada data absensi untuk bulan ${getMonthName(bulan)}</p>
+        <div class="text-center py-8">
+          <i class="fa-solid fa-triangle-exclamation text-5xl text-amber-500 mb-3"></i>
+          <h3 class="font-bold text-gray-800 dark:text-white mb-1">Sheet Belum Tersedia</h3>
+          <p class="text-sm text-gray-500 dark:text-gray-400 mb-3">${res.message || 'Data untuk bulan ini belum tersedia'}</p>
         </div>
       `;
-      
-      // Reset summary
       document.getElementById('totalHadir').textContent = '0';
       document.getElementById('totalIzin').textContent = '0';
       document.getElementById('totalAlpha').textContent = '0';
       return;
     }
 
-    // Group data per tanggal
+    if (!res.data || res.data.length === 0) {
+      listEl.innerHTML = `
+        <div class="text-center py-8">
+          <i class="fa-regular fa-calendar-xmark text-6xl text-gray-300 dark:text-gray-600 mb-3"></i>
+          <h3 class="font-bold text-gray-700 dark:text-gray-300 mb-1">Belum Ada Data</h3>
+          <p class="text-sm text-gray-500 dark:text-gray-400">Belum ada riwayat absensi untuk bulan ${getMonthName(bulan)}</p>
+        </div>
+      `;
+      document.getElementById('totalHadir').textContent = '0';
+      document.getElementById('totalIzin').textContent = '0';
+      document.getElementById('totalAlpha').textContent = '0';
+      if (countEl) countEl.textContent = '0 hari';
+      return;
+    }
+
+    // ===== Group data per tanggal =====
     const grouped = {};
     let totalHadir = 0;
     let totalIzin = 0;
     let totalAlpha = 0;
 
     res.data.forEach(item => {
-      if (!grouped[item.tanggal]) {
-        grouped[item.tanggal] = { in: null, out: null, status: '-' };
+      const tgl = item.tanggal;
+      if (!tgl) return;
+      
+      if (!grouped[tgl]) {
+        grouped[tgl] = { in: null, out: null, status: 'Alpha' };
       }
       
-      if (item.keterangan === 'IN') {
-        grouped[item.tanggal].in = item.jam;
-        grouped[item.tanggal].status = 'Hadir';
-      }
-      if (item.keterangan === 'OUT') {
-        grouped[item.tanggal].out = item.jam;
-      }
-      if (item.keterangan === 'Izin' || item.keterangan === 'izin') {
-        grouped[item.tanggal].status = 'Izin';
-        totalIzin++;
-      }
-      if (item.keterangan === 'Alpha' || item.keterangan === 'alpha') {
-        grouped[item.tanggal].status = 'Alpha';
-        totalAlpha++;
+      const ket = String(item.keterangan || '').toUpperCase();
+      const jam = item.jam ? String(item.jam).substring(0, 5) : null;
+      
+      if (ket === 'IN' || ket === 'MASUK') {
+        grouped[tgl].in = jam;
+        if (grouped[tgl].status === 'Alpha') grouped[tgl].status = 'Hadir';
+      } else if (ket === 'OUT' || ket === 'PULANG') {
+        grouped[tgl].out = jam;
+      } else if (ket === 'IZIN') {
+        grouped[tgl].status = 'Izin';
+        if (jam) grouped[tgl].in = jam;
+      } else if (ket === 'ALPHA') {
+        grouped[tgl].status = 'Alpha';
+      } else if (ket === 'CUTI' || ket === 'LIBUR') {
+        grouped[tgl].status = ket;
       }
     });
 
-    // Hitung total hadir (yang ada jam masuk)
+    // Hitung total
     Object.keys(grouped).forEach(tgl => {
-      if (grouped[tgl].in && grouped[tgl].status === 'Hadir') {
-        totalHadir++;
-      }
+      const d = grouped[tgl];
+      if (d.status === 'Hadir') totalHadir++;
+      else if (d.status === 'Izin') totalIzin++;
+      else if (d.status === 'Alpha') totalAlpha++;
     });
 
-    // Update summary cards dengan animasi
+    // Update summary dengan animasi
     animateValue('totalHadir', 0, totalHadir, 500);
     animateValue('totalIzin', 0, totalIzin, 500);
     animateValue('totalAlpha', 0, totalAlpha, 500);
 
-    // Render tabel dengan CSS classes yang proper
+    if (countEl) countEl.textContent = `${Object.keys(grouped).length} hari`;
+
+    // ===== Render Tabel =====
+    const sortedDates = Object.keys(grouped).sort((a, b) => {
+      // Format dari backend: YYYY-MM-DD
+      return a.localeCompare(b);
+    });
+
     let html = `
-      <div class="table-responsive">
-        <table class="attendance-table">
+      <div class="overflow-x-auto -mx-4 px-4">
+        <table class="w-full text-sm min-w-[500px]">
           <thead>
-            <tr>
-              <th>Tanggal</th>
-              <th>Jam Masuk</th>
-              <th>Jam Pulang</th>
-              <th>Status</th>
+            <tr class="bg-gradient-to-r from-red-800 to-red-900 text-white">
+              <th class="px-3 py-3 text-left font-semibold text-xs uppercase tracking-wider rounded-l-lg">
+                <i class="fa-regular fa-calendar mr-1"></i>Tanggal
+              </th>
+              <th class="px-3 py-3 text-center font-semibold text-xs uppercase tracking-wider">
+                <i class="fa-solid fa-arrow-right-to-bracket mr-1"></i>Jam Masuk
+              </th>
+              <th class="px-3 py-3 text-center font-semibold text-xs uppercase tracking-wider">
+                <i class="fa-solid fa-arrow-right-from-bracket mr-1"></i>Jam Pulang
+              </th>
+              <th class="px-3 py-3 text-center font-semibold text-xs uppercase tracking-wider rounded-r-lg">
+                <i class="fa-solid fa-circle-info mr-1"></i>Status
+              </th>
             </tr>
           </thead>
-          <tbody>
+          <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
     `;
 
-    // Sort tanggal dan render
-    const sortedDates = Object.keys(grouped).sort((a, b) => new Date(a) - new Date(b));
-    
-    sortedDates.forEach(tgl => {
+    sortedDates.forEach((tgl, idx) => {
       const d = grouped[tgl];
       
-      // Format tanggal yang lebih baik
-      let tglFmt;
+      // Format tanggal: YYYY-MM-DD → "Sen, 01 Jul 2026"
+      let tglFmt = tgl;
+      let dayName = '';
       try {
-        const dateObj = new Date(tgl);
+        // Parse YYYY-MM-DD dengan benar (hindari timezone shift)
+        const [y, m, dd] = tgl.split('-').map(Number);
+        const dateObj = new Date(y, m - 1, dd);
         tglFmt = dateObj.toLocaleDateString('id-ID', { 
-          weekday: 'short', 
           day: '2-digit', 
-          month: 'short', 
-          year: 'numeric' 
+          month: 'short'
         });
+        dayName = dateObj.toLocaleDateString('id-ID', { weekday: 'short' });
       } catch (e) {
-        tglFmt = tgl; // fallback jika format tanggal tidak valid
+        tglFmt = tgl;
       }
 
-      // Tentukan status badge class
-      let statusClass = 'status-hadir';
-      let statusText = d.status || 'Hadir';
+      // Tentukan style status
+      let statusBadge = '';
+      let rowBg = '';
       
-      if (d.in && !d.out) {
-        statusClass = 'status-belum-pulang';
-        statusText = 'Belum Pulang';
-      } else if (statusText === 'Izin') {
-        statusClass = 'status-izin';
-      } else if (statusText === 'Alpha') {
-        statusClass = 'status-alpha';
+      if (d.status === 'Hadir') {
+        if (d.in && !d.out) {
+          statusBadge = `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+            <i class="fa-solid fa-clock text-[8px]"></i> Belum Pulang
+          </span>`;
+          rowBg = 'bg-blue-50/40 dark:bg-blue-900/10';
+        } else {
+          statusBadge = `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300">
+            <i class="fa-solid fa-check text-[8px]"></i> Hadir
+          </span>`;
+          rowBg = idx % 2 === 0 ? '' : 'bg-gray-50/50 dark:bg-gray-700/20';
+        }
+      } else if (d.status === 'Izin') {
+        statusBadge = `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+          <i class="fa-solid fa-file text-[8px]"></i> Izin
+        </span>`;
+        rowBg = 'bg-amber-50/40 dark:bg-amber-900/10';
+      } else if (d.status === 'Alpha') {
+        statusBadge = `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300">
+          <i class="fa-solid fa-xmark text-[8px]"></i> Alpha
+        </span>`;
+        rowBg = 'bg-red-50/40 dark:bg-red-900/10';
+      } else if (d.status === 'Cuti') {
+        statusBadge = `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">
+          <i class="fa-solid fa-umbrella-beach text-[8px]"></i> Cuti
+        </span>`;
+        rowBg = 'bg-purple-50/40 dark:bg-purple-900/10';
+      } else if (d.status === 'Libur') {
+        statusBadge = `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+          <i class="fa-solid fa-mug-hot text-[8px]"></i> Libur
+        </span>`;
+        rowBg = 'bg-gray-50/40 dark:bg-gray-700/20';
+      } else {
+        statusBadge = `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">${d.status}</span>`;
       }
+
+      // Format jam masuk & pulang
+      const jamMasukHtml = d.in 
+        ? `<span class="inline-flex items-center gap-1 px-2 py-1 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 rounded-md font-bold text-xs border border-green-200 dark:border-green-800">
+            <i class="fa-solid fa-right-to-bracket text-[10px]"></i>${d.in}
+          </span>`
+        : '<span class="text-gray-300 dark:text-gray-600 text-xs">—</span>';
+
+      const jamPulangHtml = d.out 
+        ? `<span class="inline-flex items-center gap-1 px-2 py-1 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 rounded-md font-bold text-xs border border-red-200 dark:border-red-800">
+            <i class="fa-solid fa-right-from-bracket text-[10px]"></i>${d.out}
+          </span>`
+        : '<span class="text-gray-300 dark:text-gray-600 text-xs">—</span>';
 
       html += `
-        <tr>
-          <td><strong>${tglFmt}</strong></td>
-          <td>${d.in ? `<span class="text-green-600 dark:text-green-400 font-semibold">${d.in}</span>` : '<span class="text-gray-400">-</span>'}</td>
-          <td>${d.out ? `<span class="text-red-600 dark:text-red-400 font-semibold">${d.out}</span>` : '<span class="text-gray-400">-</span>'}</td>
-          <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+        <tr class="${rowBg} hover:bg-red-50/50 dark:hover:bg-red-900/10 transition-colors">
+          <td class="px-3 py-3">
+            <div class="flex items-center gap-2">
+              <div class="w-9 h-9 rounded-lg bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400 flex flex-col items-center justify-center flex-shrink-0">
+                <span class="text-[8px] font-bold uppercase leading-none">${dayName}</span>
+                <span class="text-sm font-black leading-none mt-0.5">${tglFmt.split(' ')[0]}</span>
+              </div>
+              <div class="leading-tight">
+                <p class="font-bold text-gray-800 dark:text-white text-xs">${tglFmt}</p>
+                <p class="text-[10px] text-gray-500 dark:text-gray-400">${dayName}</p>
+              </div>
+            </div>
+          </td>
+          <td class="px-3 py-3 text-center">${jamMasukHtml}</td>
+          <td class="px-3 py-3 text-center">${jamPulangHtml}</td>
+          <td class="px-3 py-3 text-center">${statusBadge}</td>
         </tr>
       `;
     });
@@ -1116,6 +1217,27 @@ async function loadRekap(bulanKey = null) {
           </tbody>
         </table>
       </div>
+      
+      <!-- Footer Summary -->
+      <div class="px-4 py-3 bg-gray-50 dark:bg-gray-900/50 border-t border-gray-100 dark:border-gray-700">
+        <div class="flex items-center justify-between text-xs">
+          <span class="text-gray-500 dark:text-gray-400">
+            <i class="fa-solid fa-info-circle mr-1"></i>
+            Total ${Object.keys(grouped).length} hari tercatat
+          </span>
+          <div class="flex items-center gap-3">
+            <span class="flex items-center gap-1 text-green-600 dark:text-green-400 font-bold">
+              <span class="w-2 h-2 bg-green-500 rounded-full"></span>${totalHadir}
+            </span>
+            <span class="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-bold">
+              <span class="w-2 h-2 bg-amber-500 rounded-full"></span>${totalIzin}
+            </span>
+            <span class="flex items-center gap-1 text-red-600 dark:text-red-400 font-bold">
+              <span class="w-2 h-2 bg-red-500 rounded-full"></span>${totalAlpha}
+            </span>
+          </div>
+        </div>
+      </div>
     `;
 
     listEl.innerHTML = html;
@@ -1123,11 +1245,11 @@ async function loadRekap(bulanKey = null) {
   } catch (error) {
     console.error('Error loading rekap:', error);
     listEl.innerHTML = `
-      <div class="error-state">
-        <i class="fa-solid fa-circle-exclamation text-5xl mb-3 text-red-500"></i>
-        <h3>Gagal Memuat Data</h3>
-        <p>Terjadi kesalahan saat mengambil data absensi</p>
-        <button onclick="loadRekap('${bulan}')" class="btn-retry">
+      <div class="text-center py-8">
+        <i class="fa-solid fa-circle-exclamation text-5xl text-red-500 mb-3"></i>
+        <h3 class="font-bold text-gray-800 dark:text-white mb-1">Gagal Memuat Data</h3>
+        <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">Terjadi kesalahan koneksi</p>
+        <button onclick="loadRekap('${bulan}')" class="bg-red-800 hover:bg-red-900 text-white px-5 py-2 rounded-lg text-sm font-semibold transition shadow-sm">
           <i class="fa-solid fa-rotate-right mr-2"></i>Coba Lagi
         </button>
       </div>
