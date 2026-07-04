@@ -995,12 +995,28 @@ async function loadRekap(bulanKey = null) {
   const listEl = document.getElementById('listRekap');
   const countEl = document.getElementById('rekapCount');
   
-  // Gunakan parameter bulanKey atau ambil dari selector
+  // Pastikan user login
+  if (!user) {
+    console.error('❌ User tidak login');
+    listEl.innerHTML = `
+      <div class="text-center py-8">
+        <i class="fa-solid fa-circle-exclamation text-5xl text-red-500 mb-3"></i>
+        <h3 class="font-bold text-gray-800 dark:text-white mb-1">Session Expired</h3>
+        <p class="text-sm text-gray-500 dark:text-gray-400">Silakan login ulang</p>
+      </div>
+    `;
+    return;
+  }
+  
   const bulan = bulanKey || document.getElementById('monthSelector')?.value || getCurrentMonthKey();
   const [month, year] = bulan.split('_');
   const bulanParam = `${month}/${year}`;
+  
+  console.log('🔍 Loading rekap:');
+  console.log('   Bulan:', bulanParam);
+  console.log('   Username:', user.username);
+  console.log('   Nama:', user.nama);
 
-  // Loading state
   listEl.innerHTML = `
     <div class="text-center py-8">
       <div class="inline-block w-10 h-10 border-4 border-red-200 border-t-red-800 rounded-full animate-spin mb-3"></div>
@@ -1010,18 +1026,25 @@ async function loadRekap(bulanKey = null) {
   if (countEl) countEl.textContent = '';
 
   try {
+    // Kirim username DAN nama ke backend
     const res = await api('getRekapFromSheetBulanan', {
       username: user.username,
+      nama: user.nama,
       bulan: bulanParam
     });
 
-    // Handle error dari backend
+    console.log('📥 Response:', res);
+
     if (res.status === 'error') {
+      console.error('❌ Error:', res.message);
       listEl.innerHTML = `
         <div class="text-center py-8">
           <i class="fa-solid fa-triangle-exclamation text-5xl text-amber-500 mb-3"></i>
-          <h3 class="font-bold text-gray-800 dark:text-white mb-1">Sheet Belum Tersedia</h3>
-          <p class="text-sm text-gray-500 dark:text-gray-400 mb-3">${res.message || 'Data untuk bulan ini belum tersedia'}</p>
+          <h3 class="font-bold text-gray-800 dark:text-white mb-1">Error</h3>
+          <p class="text-sm text-gray-500 dark:text-gray-400 mb-3">${res.message}</p>
+          <button onclick="loadRekap('${bulan}')" class="bg-red-800 text-white px-4 py-2 rounded-lg text-sm">
+            <i class="fa-solid fa-rotate-right mr-2"></i>Coba Lagi
+          </button>
         </div>
       `;
       document.getElementById('totalHadir').textContent = '0';
@@ -1031,11 +1054,13 @@ async function loadRekap(bulanKey = null) {
     }
 
     if (!res.data || res.data.length === 0) {
+      console.log('⚠️ Tidak ada data');
       listEl.innerHTML = `
         <div class="text-center py-8">
           <i class="fa-regular fa-calendar-xmark text-6xl text-gray-300 dark:text-gray-600 mb-3"></i>
           <h3 class="font-bold text-gray-700 dark:text-gray-300 mb-1">Belum Ada Data</h3>
           <p class="text-sm text-gray-500 dark:text-gray-400">Belum ada riwayat absensi untuk bulan ${getMonthName(bulan)}</p>
+          <p class="text-xs text-gray-400 mt-2">Nama: ${user.nama} | Username: ${user.username}</p>
         </div>
       `;
       document.getElementById('totalHadir').textContent = '0';
@@ -1045,7 +1070,9 @@ async function loadRekap(bulanKey = null) {
       return;
     }
 
-    // ===== Group data per tanggal =====
+    console.log('✅ Data ditemukan:', res.data.length, 'records');
+    
+    // Group data per tanggal
     const grouped = {};
     let totalHadir = 0;
     let totalIzin = 0;
@@ -1072,12 +1099,9 @@ async function loadRekap(bulanKey = null) {
         if (jam) grouped[tgl].in = jam;
       } else if (ket === 'ALPHA') {
         grouped[tgl].status = 'Alpha';
-      } else if (ket === 'CUTI' || ket === 'LIBUR') {
-        grouped[tgl].status = ket;
       }
     });
 
-    // Hitung total
     Object.keys(grouped).forEach(tgl => {
       const d = grouped[tgl];
       if (d.status === 'Hadir') totalHadir++;
@@ -1085,18 +1109,13 @@ async function loadRekap(bulanKey = null) {
       else if (d.status === 'Alpha') totalAlpha++;
     });
 
-    // Update summary dengan animasi
     animateValue('totalHadir', 0, totalHadir, 500);
     animateValue('totalIzin', 0, totalIzin, 500);
     animateValue('totalAlpha', 0, totalAlpha, 500);
 
     if (countEl) countEl.textContent = `${Object.keys(grouped).length} hari`;
 
-    // ===== Render Tabel =====
-    const sortedDates = Object.keys(grouped).sort((a, b) => {
-      // Format dari backend: YYYY-MM-DD
-      return a.localeCompare(b);
-    });
+    const sortedDates = Object.keys(grouped).sort((a, b) => a.localeCompare(b));
 
     let html = `
       <div class="overflow-x-auto -mx-4 px-4">
@@ -1123,23 +1142,17 @@ async function loadRekap(bulanKey = null) {
     sortedDates.forEach((tgl, idx) => {
       const d = grouped[tgl];
       
-      // Format tanggal: YYYY-MM-DD → "Sen, 01 Jul 2026"
       let tglFmt = tgl;
       let dayName = '';
       try {
-        // Parse YYYY-MM-DD dengan benar (hindari timezone shift)
         const [y, m, dd] = tgl.split('-').map(Number);
         const dateObj = new Date(y, m - 1, dd);
-        tglFmt = dateObj.toLocaleDateString('id-ID', { 
-          day: '2-digit', 
-          month: 'short'
-        });
+        tglFmt = dateObj.toLocaleDateString('id-ID', { day: '2-digit', month: 'short' });
         dayName = dateObj.toLocaleDateString('id-ID', { weekday: 'short' });
       } catch (e) {
         tglFmt = tgl;
       }
 
-      // Tentukan style status
       let statusBadge = '';
       let rowBg = '';
       
@@ -1165,21 +1178,10 @@ async function loadRekap(bulanKey = null) {
           <i class="fa-solid fa-xmark text-[8px]"></i> Alpha
         </span>`;
         rowBg = 'bg-red-50/40 dark:bg-red-900/10';
-      } else if (d.status === 'Cuti') {
-        statusBadge = `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">
-          <i class="fa-solid fa-umbrella-beach text-[8px]"></i> Cuti
-        </span>`;
-        rowBg = 'bg-purple-50/40 dark:bg-purple-900/10';
-      } else if (d.status === 'Libur') {
-        statusBadge = `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">
-          <i class="fa-solid fa-mug-hot text-[8px]"></i> Libur
-        </span>`;
-        rowBg = 'bg-gray-50/40 dark:bg-gray-700/20';
       } else {
         statusBadge = `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">${d.status}</span>`;
       }
 
-      // Format jam masuk & pulang
       const jamMasukHtml = d.in 
         ? `<span class="inline-flex items-center gap-1 px-2 py-1 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 rounded-md font-bold text-xs border border-green-200 dark:border-green-800">
             <i class="fa-solid fa-right-to-bracket text-[10px]"></i>${d.in}
@@ -1218,7 +1220,6 @@ async function loadRekap(bulanKey = null) {
         </table>
       </div>
       
-      <!-- Footer Summary -->
       <div class="px-4 py-3 bg-gray-50 dark:bg-gray-900/50 border-t border-gray-100 dark:border-gray-700">
         <div class="flex items-center justify-between text-xs">
           <span class="text-gray-500 dark:text-gray-400">
@@ -1248,7 +1249,7 @@ async function loadRekap(bulanKey = null) {
       <div class="text-center py-8">
         <i class="fa-solid fa-circle-exclamation text-5xl text-red-500 mb-3"></i>
         <h3 class="font-bold text-gray-800 dark:text-white mb-1">Gagal Memuat Data</h3>
-        <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">Terjadi kesalahan koneksi</p>
+        <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">${error.message}</p>
         <button onclick="loadRekap('${bulan}')" class="bg-red-800 hover:bg-red-900 text-white px-5 py-2 rounded-lg text-sm font-semibold transition shadow-sm">
           <i class="fa-solid fa-rotate-right mr-2"></i>Coba Lagi
         </button>
