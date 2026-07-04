@@ -604,23 +604,64 @@ setInterval(updateJamRealtime, 1000);
 
 async function loadHomeStats() {
   try {
+    // Gunakan getRekapFromSheetBulanan untuk bulan saat ini
+    const now = new Date();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const year = now.getFullYear();
+    const bulanParam = `${month}/${year}`;
+    
+    console.log('📊 Loading home stats untuk bulan:', bulanParam);
+    
     const [rekap, patroli] = await Promise.all([
-      api('getRekap', { username: user.username }),
+      api('getRekapFromSheetBulanan', { 
+        username: user.username,
+        nama: user.nama,
+        bulan: bulanParam 
+      }),
       api('getPatroli', { username: user.username })
     ]);
+
+    console.log(' Rekap response:', rekap);
+    console.log('📥 Patroli response:', patroli);
 
     const statHadir = document.getElementById('statHadir');
     const statTelat = document.getElementById('statTelat');
     const statPatroli = document.getElementById('statPatroli');
 
-    if (rekap.status === 'success' && statHadir) {
-      const hadir = rekap.data.filter(r => r.keterangan === 'IN' && r.jam && r.jam !== '--:--').length;
+    if (rekap.status === 'success' && rekap.data && statHadir) {
+      // Group data per tanggal untuk hitung hadir
+      const grouped = {};
+      rekap.data.forEach(item => {
+        if (!grouped[item.tanggal]) {
+          grouped[item.tanggal] = { in: null, out: null };
+        }
+        const ket = String(item.keterangan || '').toUpperCase();
+        if (ket === 'IN' || ket === 'MASUK') {
+          grouped[item.tanggal].in = item.jam;
+        }
+        if (ket === 'OUT' || ket === 'PULANG') {
+          grouped[item.tanggal].out = item.jam;
+        }
+      });
+      
+      // Hitung hadir = yang ada jam masuk
+      const hadir = Object.keys(grouped).filter(tgl => grouped[tgl].in).length;
       statHadir.textContent = hadir;
-      if (statTelat) statTelat.textContent = 0;
+      
+      console.log('✅ Hadir bulan ini:', hadir);
+      
+      // Hitung telat (opsional - bisa disesuaikan dengan jam masuk standar)
+      // Untuk sekarang tampilkan 0 atau hitung berdasarkan jam masuk > 08:00
+      if (statTelat) statTelat.textContent = '0';
+    } else {
+      console.warn('⚠️ Rekap error atau kosong:', rekap);
+      if (statHadir) statHadir.textContent = '0';
+      if (statTelat) statTelat.textContent = '0';
     }
 
     if (patroli.status === 'success' && statPatroli) {
       statPatroli.textContent = patroli.data.length;
+      console.log('✅ Patroli bulan ini:', patroli.data.length);
 
       const aktivitasEl = document.getElementById('aktivitasTerakhir');
       if (aktivitasEl && patroli.data.length > 0) {
