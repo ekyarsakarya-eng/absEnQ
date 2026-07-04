@@ -41,309 +41,137 @@ tailwind.config = {
   * { -webkit-tap-highlight-color: transparent; }
   
   /* ==================== REKAP ABSENSI STYLES ==================== */
-  
-  /* Table Container */
-  .table-responsive {
-    overflow-x: auto;
-    margin-top: 1rem;
-    -webkit-overflow-scrolling: touch;
-  }
-  
-  /* Attendance Table */
-  .attendance-table {
-    width: 100%;
-    border-collapse: collapse;
-    background: white;
-    border-radius: 12px;
-    overflow: hidden;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-  }
-  
-  .dark .attendance-table {
-    background: #1f2937;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-  }
-  
-  /* Table Header */
-  .attendance-table thead {
-    background: linear-gradient(135deg, #800000 0%, #5c0000 100%);
-    color: white;
-  }
-  
-  .attendance-table th {
-    padding: 14px 16px;
-    text-align: left;
-    font-weight: 600;
-    font-size: 14px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-  }
-  
-  /* Table Body */
+
+/* Table Container */
+.table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+.table-responsive::-webkit-scrollbar {
+  height: 6px;
+}
+
+.table-responsive::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+.dark .table-responsive::-webkit-scrollbar-track {
+  background: #374151;
+}
+
+.table-responsive::-webkit-scrollbar-thumb {
+  background: #dc2626;
+  border-radius: 3px;
+}
+
+/* Table Header Animation */
+.attendance-table thead th {
+  position: relative;
+  overflow: hidden;
+}
+
+.attendance-table thead th::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+  animation: shimmer 3s infinite;
+}
+
+@keyframes shimmer {
+  0% { left: -100%; }
+  100% { left: 100%; }
+}
+
+/* Status Badge Hover */
+.status-badge {
+  transition: transform 0.2s ease;
+}
+
+.status-badge:hover {
+  transform: scale(1.05);
+}
+
+/* Summary Cards Animation */
+@keyframes countUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+#totalHadir, #totalIzin, #totalAlpha {
+  animation: countUp 0.5s ease-out;
+}
+
+/* Table Row Entrance Animation */
+.attendance-table tbody tr {
+  animation: fadeInRow 0.3s ease-out;
+  animation-fill-mode: both;
+}
+
+@keyframes fadeInRow {
+  from { opacity: 0; transform: translateX(-10px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+/* Stagger animation for rows */
+.attendance-table tbody tr:nth-child(1) { animation-delay: 0.02s; }
+.attendance-table tbody tr:nth-child(2) { animation-delay: 0.04s; }
+.attendance-table tbody tr:nth-child(3) { animation-delay: 0.06s; }
+.attendance-table tbody tr:nth-child(4) { animation-delay: 0.08s; }
+.attendance-table tbody tr:nth-child(5) { animation-delay: 0.10s; }
+
+/* Month Selector Focus */
+.month-selector select {
+  transition: all 0.2s ease;
+}
+
+.month-selector select:focus {
+  box-shadow: 0 0 0 3px rgba(128, 0, 0, 0.1);
+}
+
+/* Responsive Adjustments */
+@media (max-width: 640px) {
+  .attendance-table th,
   .attendance-table td {
-    padding: 14px 16px;
-    border-bottom: 1px solid #e5e7eb;
-    font-size: 14px;
-  }
-  
-  .dark .attendance-table td {
-    border-bottom: 1px solid #374151;
-    color: #e5e7eb;
-  }
-  
-  .attendance-table tbody tr {
-    transition: background-color 0.2s ease;
-  }
-  
-  .attendance-table tbody tr:hover {
-    background-color: #f9fafb;
-  }
-  
-  .dark .attendance-table tbody tr:hover {
-    background-color: #374151;
-  }
-  
-  .attendance-table tbody tr:last-child td {
-    border-bottom: none;
-  }
-  
-  /* Status Badges */
-  .status-badge {
-    padding: 6px 14px;
-    border-radius: 20px;
+    padding: 10px 8px;
     font-size: 12px;
-    font-weight: 600;
-    display: inline-block;
-    text-align: center;
-    min-width: 100px;
   }
   
-  .status-hadir {
-    background: #d1fae5;
-    color: #065f46;
+  .status-badge {
+    padding: 4px 8px;
+    font-size: 10px;
+    min-width: 70px;
   }
   
-  .dark .status-hadir {
-    background: #064e3b;
-    color: #6ee7b7;
+  #totalHadir, #totalIzin, #totalAlpha {
+    font-size: 1.5rem;
+  }
+}
+
+/* Print Styles */
+@media print {
+  .attendance-table {
+    box-shadow: none !important;
+    border: 1px solid #000;
   }
   
-  .status-belum-pulang {
-    background: #fef3c7;
-    color: #92400e;
+  .attendance-table thead {
+    background: #800000 !important;
+    color: white !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
   
-  .dark .status-belum-pulang {
-    background: #78350f;
-    color: #fcd34d;
+  nav, button, .month-selector {
+    display: none !important;
   }
-  
-  .status-alpha {
-    background: #fee2e2;
-    color: #991b1b;
-  }
-  
-  .dark .status-alpha {
-    background: #7f1d1d;
-    color: #fca5a5;
-  }
-  
-  .status-izin {
-    background: #dbeafe;
-    color: #1e40af;
-  }
-  
-  .dark .status-izin {
-    background: #1e3a8a;
-    color: #93c5fd;
-  }
-  
-  /* Empty & Error States */
-  .empty-state,
-  .error-state,
-  .loading-state {
-    text-align: center;
-    padding: 3rem 1rem;
-    color: #6b7280;
-  }
-  
-  .dark .empty-state,
-  .dark .error-state,
-  .dark .loading-state {
-    color: #9ca3af;
-  }
-  
-  .empty-state svg,
-  .error-state svg,
-  .loading-state svg {
-    margin: 0 auto 1rem;
-    opacity: 0.5;
-  }
-  
-  .empty-state h3,
-  .error-state h3 {
-    margin: 0.5rem 0;
-    font-size: 1.25rem;
-    font-weight: 600;
-    color: #111827;
-  }
-  
-  .dark .empty-state h3,
-  .dark .error-state h3 {
-    color: #f9fafb;
-  }
-  
-  .empty-state p,
-  .error-state p {
-    margin: 0.5rem 0;
-    color: #9ca3af;
-  }
-  
-  /* Retry Button */
-  .btn-retry {
-    margin-top: 1rem;
-    padding: 10px 28px;
-    background: linear-gradient(135deg, #800000 0%, #5c0000 100%);
-    color: white;
-    border: none;
-    border-radius: 10px;
-    cursor: pointer;
-    font-weight: 600;
-    transition: all 0.2s;
-    box-shadow: 0 4px 8px rgba(128, 0, 0, 0.2);
-  }
-  
-  .btn-retry:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 12px rgba(128, 0, 0, 0.3);
-  }
-  
-  .btn-retry:active {
-    transform: translateY(0);
-  }
-  
-  /* Loading Spinner */
-  .spinner {
-    border: 4px solid #f3f4f6;
-    border-top: 4px solid #800000;
-    border-radius: 50%;
-    width: 48px;
-    height: 48px;
-    animation: spin 1s linear infinite;
-    margin: 0 auto 1rem;
-  }
-  
-  .dark .spinner {
-    border: 4px solid #374151;
-    border-top: 4px solid #800000;
-  }
-  
-  @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-  }
-  
-  /* Summary Cards */
-  .summary-cards {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 1rem;
-    margin-bottom: 1.5rem;
-  }
-  
-  .summary-card {
-    background: white;
-    border-radius: 12px;
-    padding: 1rem;
-    text-align: center;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-    transition: transform 0.2s;
-  }
-  
-  .dark .summary-card {
-    background: #1f2937;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-  }
-  
-  .summary-card:hover {
-    transform: translateY(-2px);
-  }
-  
-  .summary-card .number {
-    font-size: 2rem;
-    font-weight: 700;
-    margin-bottom: 0.25rem;
-  }
-  
-  .summary-card .label {
-    font-size: 0.875rem;
-    color: #6b7280;
-    font-weight: 500;
-  }
-  
-  .dark .summary-card .label {
-    color: #9ca3af;
-  }
-  
-  .summary-card.hadir .number { color: #059669; }
-  .summary-card.izin .number { color: #2563eb; }
-  .summary-card.alpha .number { color: #dc2626; }
-  
-  /* Month Selector */
-  .month-selector {
-    background: white;
-    border-radius: 12px;
-    padding: 1rem;
-    margin-bottom: 1.5rem;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-  }
-  
-  .dark .month-selector {
-    background: #1f2937;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-  }
-  
-  .month-selector select {
-    width: 100%;
-    padding: 10px 14px;
-    border: 2px solid #e5e7eb;
-    border-radius: 8px;
-    font-size: 14px;
-    font-weight: 500;
-    background: white;
-    cursor: pointer;
-    transition: border-color 0.2s;
-  }
-  
-  .dark .month-selector select {
-    background: #374151;
-    border-color: #4b5563;
-    color: #e5e7eb;
-  }
-  
-  .month-selector select:focus {
-    outline: none;
-    border-color: #800000;
-  }
-  
-  /* Responsive */
-  @media (max-width: 640px) {
-    .attendance-table th,
-    .attendance-table td {
-      padding: 10px 12px;
-      font-size: 13px;
-    }
-    
-    .summary-cards {
-      grid-template-columns: 1fr;
-    }
-    
-    .status-badge {
-      min-width: 80px;
-      padding: 4px 10px;
-      font-size: 11px;
-    }
-  }
+}
 </style>
 </head>
 
