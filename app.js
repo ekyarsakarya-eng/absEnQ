@@ -978,58 +978,161 @@ function changeMonth(monthKey) {
   loadRekap(monthKey);
 }
 
-async function loadRekap() {
+async function loadRekap(bulanKey = null) {
   const listEl = document.getElementById('listRekap');
-  const bulan = document.getElementById('selectBulan').value; // contoh: "07_2026"
+  
+  // Gunakan parameter bulanKey atau ambil dari selector
+  const bulan = bulanKey || document.getElementById('monthSelector').value;
   const bulanParam = bulan.replace('_', '/'); // jadi "07/2026"
 
-  listEl.innerHTML = '<p>Memuat...</p>';
-
-  const res = await api('getRekapFromSheetBulanan', {
-    username: user.username,
-    bulan: bulanParam
-  });
-
-  if (res.status !== 'success' || !res.data || res.data.length === 0) {
-    listEl.innerHTML = '<p>Belum ada data absensi untuk bulan ini</p>';
-    return;
-  }
-
-  // Group data per tanggal
-  const grouped = {};
-  res.data.forEach(item => {
-    if (!grouped[item.tanggal]) grouped[item.tanggal] = {};
-    if (item.keterangan === 'IN') grouped[item.tanggal].in = item.jam;
-    if (item.keterangan === 'OUT') grouped[item.tanggal].out = item.jam;
-  });
-
-  // Render tabel
-  let html = `
-    <table style="width:100%; border-collapse:collapse; margin-top:10px;">
-      <thead>
-        <tr style="background:#800000; color:white;">
-          <th style="padding:10px; border:1px solid #ddd;">Tanggal</th>
-          <th style="padding:10px; border:1px solid #ddd;">Jam Masuk</th>
-          <th style="padding:10px; border:1px solid #ddd;">Jam Pulang</th>
-        </tr>
-      </thead>
-      <tbody>
+  listEl.innerHTML = `
+    <div class="loading-state">
+      <div class="spinner"></div>
+      <p>Memuat data absensi...</p>
+    </div>
   `;
 
-  Object.keys(grouped).sort().forEach(tgl => {
-    const d = grouped[tgl];
-    const tglFmt = new Date(tgl).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
-    html += `
-      <tr>
-        <td style="padding:10px; border:1px solid #ddd;">${tglFmt}</td>
-        <td style="padding:10px; border:1px solid #ddd;">${d.in || '-'}</td>
-        <td style="padding:10px; border:1px solid #ddd;">${d.out || '-'}</td>
-      </tr>
-    `;
-  });
+  try {
+    const res = await api('getRekapFromSheetBulanan', {
+      username: user.username,
+      bulan: bulanParam
+    });
 
-  html += '</tbody></table>';
-  listEl.innerHTML = html;
+    if (res.status !== 'success' || !res.data || res.data.length === 0) {
+      listEl.innerHTML = `
+        <div class="empty-state">
+          <i class="fa-solid fa-calendar-xmark text-5xl mb-3 opacity-50"></i>
+          <h3>Belum Ada Data</h3>
+          <p>Belum ada data absensi untuk bulan ${getMonthName(bulan)}</p>
+        </div>
+      `;
+      
+      // Reset summary
+      document.getElementById('totalHadir').textContent = '0';
+      document.getElementById('totalIzin').textContent = '0';
+      document.getElementById('totalAlpha').textContent = '0';
+      return;
+    }
+
+    // Group data per tanggal
+    const grouped = {};
+    let totalHadir = 0;
+    let totalIzin = 0;
+    let totalAlpha = 0;
+
+    res.data.forEach(item => {
+      if (!grouped[item.tanggal]) {
+        grouped[item.tanggal] = { in: null, out: null, status: '-' };
+      }
+      
+      if (item.keterangan === 'IN') {
+        grouped[item.tanggal].in = item.jam;
+        grouped[item.tanggal].status = 'Hadir';
+      }
+      if (item.keterangan === 'OUT') {
+        grouped[item.tanggal].out = item.jam;
+      }
+      if (item.keterangan === 'Izin' || item.keterangan === 'izin') {
+        grouped[item.tanggal].status = 'Izin';
+        totalIzin++;
+      }
+      if (item.keterangan === 'Alpha' || item.keterangan === 'alpha') {
+        grouped[item.tanggal].status = 'Alpha';
+        totalAlpha++;
+      }
+    });
+
+    // Hitung total hadir (yang ada jam masuk)
+    Object.keys(grouped).forEach(tgl => {
+      if (grouped[tgl].in && grouped[tgl].status === 'Hadir') {
+        totalHadir++;
+      }
+    });
+
+    // Update summary cards dengan animasi
+    animateValue('totalHadir', 0, totalHadir, 500);
+    animateValue('totalIzin', 0, totalIzin, 500);
+    animateValue('totalAlpha', 0, totalAlpha, 500);
+
+    // Render tabel dengan CSS classes yang proper
+    let html = `
+      <div class="table-responsive">
+        <table class="attendance-table">
+          <thead>
+            <tr>
+              <th>Tanggal</th>
+              <th>Jam Masuk</th>
+              <th>Jam Pulang</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+    `;
+
+    // Sort tanggal dan render
+    const sortedDates = Object.keys(grouped).sort((a, b) => new Date(a) - new Date(b));
+    
+    sortedDates.forEach(tgl => {
+      const d = grouped[tgl];
+      
+      // Format tanggal yang lebih baik
+      let tglFmt;
+      try {
+        const dateObj = new Date(tgl);
+        tglFmt = dateObj.toLocaleDateString('id-ID', { 
+          weekday: 'short', 
+          day: '2-digit', 
+          month: 'short', 
+          year: 'numeric' 
+        });
+      } catch (e) {
+        tglFmt = tgl; // fallback jika format tanggal tidak valid
+      }
+
+      // Tentukan status badge class
+      let statusClass = 'status-hadir';
+      let statusText = d.status || 'Hadir';
+      
+      if (d.in && !d.out) {
+        statusClass = 'status-belum-pulang';
+        statusText = 'Belum Pulang';
+      } else if (statusText === 'Izin') {
+        statusClass = 'status-izin';
+      } else if (statusText === 'Alpha') {
+        statusClass = 'status-alpha';
+      }
+
+      html += `
+        <tr>
+          <td><strong>${tglFmt}</strong></td>
+          <td>${d.in ? `<span class="text-green-600 dark:text-green-400 font-semibold">${d.in}</span>` : '<span class="text-gray-400">-</span>'}</td>
+          <td>${d.out ? `<span class="text-red-600 dark:text-red-400 font-semibold">${d.out}</span>` : '<span class="text-gray-400">-</span>'}</td>
+          <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+        </tr>
+      `;
+    });
+
+    html += `
+          </tbody>
+        </table>
+      </div>
+    `;
+
+    listEl.innerHTML = html;
+
+  } catch (error) {
+    console.error('Error loading rekap:', error);
+    listEl.innerHTML = `
+      <div class="error-state">
+        <i class="fa-solid fa-circle-exclamation text-5xl mb-3 text-red-500"></i>
+        <h3>Gagal Memuat Data</h3>
+        <p>Terjadi kesalahan saat mengambil data absensi</p>
+        <button onclick="loadRekap('${bulan}')" class="btn-retry">
+          <i class="fa-solid fa-rotate-right mr-2"></i>Coba Lagi
+        </button>
+      </div>
+    `;
+  }
 }
 
 function animateValue(id, start, end, duration) {
