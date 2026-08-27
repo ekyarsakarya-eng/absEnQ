@@ -2,22 +2,90 @@
 // KONFIGURASI & VARIABEL GLOBAL
 // ============================================
 const URL_GAS = 'https://script.google.com/macros/s/AKfycbzCy0IA8NAf2m9Bd90QNAEmIwVi_euT37Ut0_-hlZKk563vtpV3xVV0GFIHMbswsSny/exec';
-console.log('🚀 App.js loaded - v1.1 with Rekap Monthly');
+console.log(' App.js loaded - v2.0 OPTIMIZED with Cache');
+
+// === SISTEM CACHE LOKAL (KUNCI KECEPATAN) ===
+const AppCache = {
+  set: (key, data, ttl = 300000) => { // TTL default 5 menit
+    try {
+      const item = { data, expiry: Date.now() + ttl, timestamp: Date.now() };
+      localStorage.setItem('absenq_' + key, JSON.stringify(item));
+    } catch (e) { console.warn('❌ Cache save failed:', e); }
+  },
+  get: (key) => {
+    try {
+      const item = localStorage.getItem('absenq_' + key);
+      if (!item) return null;
+      const parsed = JSON.parse(item);
+      if (Date.now() > parsed.expiry) {
+        localStorage.removeItem('absenq_' + key);
+        return null;
+      }
+      return parsed.data;
+    } catch (e) { return null; }
+  },
+  clear: () => {
+    Object.keys(localStorage).forEach(k => {
+      if (k.startsWith('absenq_')) localStorage.removeItem(k);
+    });
+  }
+};
+
+// === API WRAPPER DENGAN TIMEOUT & RETRY ===
+async function api(action, data = {}, useCache = true, cacheTTL = 60000) {
+  const cacheKey = `${action}_${JSON.stringify(data)}`;
+  
+  // 1. Cek cache dulu (INSTAN!)
+  if (useCache) {
+    const cached = AppCache.get(cacheKey);
+    if (cached) return cached;
+  }
+  
+  // 2. Fetch dari server jika tidak ada di cache
+  try {
+    const url = URL_GAS + '?t=' + Date.now(); // Bypass browser cache
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+    
+    const res = await fetch(url, {
+      method: 'POST',
+      signal: controller.signal,
+      body: JSON.stringify({ action, ...data })
+    });
+    
+    clearTimeout(timeoutId);
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+    
+    const result = await res.json();
+    
+    // 3. Simpan ke cache jika sukses
+    if (useCache && result.status === 'success') {
+      AppCache.set(cacheKey, result, cacheTTL);
+    }
+    
+    return result;
+  } catch (e) {
+    console.error(`❌ API ${action} failed:`, e.message);
+    
+    // Fallback: gunakan data lama dari cache jika ada
+    if (useCache) {
+      const oldCached = AppCache.get(cacheKey);
+      if (oldCached) return oldCached;
+    }
+    
+    return { status: 'error', message: 'Koneksi gagal: ' + e.message };
+  }
+}
 
 // Debug connection
 async function testConnection() {
   try {
     console.log('🔍 Testing connection to GAS...');
-    const response = await fetch(URL_GAS, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'test' })
-    });
-    const data = await response.json();
-    console.log('✅ Connection OK:', data);
+    const startTime = Date.now();
+    const response = await api('test', {}, false); // No cache for test
+    console.log(`✅ Connection OK in ${Date.now() - startTime}ms:`, response);
   } catch (err) {
     console.error('❌ Connection FAILED:', err);
-    console.error('❌ Error details:', err.message);
   }
 }
 testConnection();
@@ -37,6 +105,17 @@ let dataPatroli = [];
 let dataKejadian = [];
 let dataPembinaan = [];
 let selectedMonth = '';
+let isOnline = navigator.onLine;
+
+// Detect online/offline status
+window.addEventListener('online', () => { 
+  isOnline = true; 
+  if (user) syncDataInBackground();
+});
+window.addEventListener('offline', () => { 
+  isOnline = false; 
+  toast('Anda sedang offline. Data akan disinkronkan saat online.');
+});
 
 // ============================================
 // PWA INSTALL UNIVERSAL
@@ -44,8 +123,6 @@ let selectedMonth = '';
 let deferredPrompt;
 const installPopup = document.getElementById('installPopup');
 const btnAndroid = document.getElementById('btnInstallAndroid');
-const btnIOS = document.getElementById('btnIOS');
-const iosSteps = document.getElementById('iosSteps');
 
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 const isInStandalone = () => window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
@@ -56,7 +133,6 @@ window.addEventListener('beforeinstallprompt', (e) => {
   if (!isInStandalone()) {
     installPopup.classList.remove('hidden');
     installPopup.classList.add('flex');
-    btnAndroid.classList.remove('hidden');
   }
 });
 
@@ -68,37 +144,86 @@ btnAndroid?.addEventListener('click', async () => {
   installPopup.classList.add('hidden');
 });
 
-if (isIOS && !isInStandalone()) {
-  installPopup.classList.remove('hidden');
-  installPopup.classList.add('flex');
-  if (btnIOS) {
-    btnIOS.classList.remove('hidden');
-  }
-}
-
-btnIOS?.addEventListener('click', () => {
-  if (iosSteps) {
-    iosSteps.classList.toggle('hidden');
-  }
-  if (btnIOS) {
-    btnIOS.innerHTML = iosSteps.classList.contains('hidden')
-      ? '<i class="fa-solid fa-share-from-square mr-2"></i>Lihat Cara Install'
-      : '<i class="fa-solid fa-check mr-2"></i>Sudah Install? Buka dari Home';
-  }
-});
-
 if (isInStandalone() && installPopup) installPopup.classList.add('hidden');
 
 // ============================================
-// INIT APP
+// INIT APP (OPTIMIZED INSTANT LOAD)
 // ============================================
 const app = document.getElementById('app');
-if (!app) console.error('❌ Div #app tidak ditemukan!');
-if (isDark) document.documentElement.classList.add('dark');
+
+async function initApp() {
+  console.log('🚀 Initializing app...');
+  
+  // 1. Tampilkan UI dari cache INSTAN (< 50ms)
+  const cachedUser = AppCache.get('currentUser');
+  const cachedStatus = AppCache.get('statusAbsen');
+  
+  if (cachedUser && !user) {
+    user = cachedUser;
+    console.log('✅ Loaded user from cache');
+  }
+  
+  if (cachedStatus) {
+    statusServer = cachedStatus;
+    console.log('✅ Loaded status from cache');
+  }
+  
+  // 2. Render UI immediately & sembunyikan skeleton
+  if (!user) {
+    renderLogin();
+  } else {
+    renderDashboard();
+    
+    // 3. Background sync (tidak blocking UI)
+    if (isOnline) {
+      syncDataInBackground();
+    }
+  }
+  
+  // Sembunyikan skeleton, tampilkan app
+  document.getElementById('skeleton-screen').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  
+  // 4. Start GPS & Clock
+  dapatkanLokasiGPS();
+  setInterval(updateJamRealtime, 1000);
+}
+
+// === BACKGROUND SYNC (Non-blocking) ===
+async function syncDataInBackground() {
+  if (!user || !isOnline) return;
+  
+  try {
+    const [userRes, statusRes] = await Promise.all([
+      api('login', { username: user.username, password: user.password }, true, 3600000),
+      api('cekStatus', { username: user.username }, true, 30000)
+    ]);
+    
+    if (userRes.status === 'success') {
+      user = userRes;
+      localStorage.setItem('user', JSON.stringify(user));
+      AppCache.set('currentUser', userRes, 3600000);
+    }
+    
+    if (statusRes.status === 'success') {
+      statusServer = statusRes;
+      AppCache.set('statusAbsen', statusRes, 30000);
+      
+      if (currentPage === 'home') {
+        const contentArea = document.getElementById('contentArea');
+        if (contentArea) {
+          contentArea.innerHTML = renderPage();
+          loadHomeStats();
+        }
+      }
+    }
+  } catch (e) {
+    console.error('❌ Background sync failed:', e);
+  }
+}
 
 function render() {
-  if (!user) return renderLogin();
-  renderDashboard();
+  initApp();
 }
 
 // ============================================
@@ -145,10 +270,14 @@ async function login() {
   btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>Memproses...';
   
   try {
-    const res = await api('login', { username, password });
+    const res = await api('login', { username, password }, false); // No cache for login
+    
     if (res.status === 'success') {
       user = res;
       localStorage.setItem('user', JSON.stringify(user));
+      AppCache.set('currentUser', res, 3600000);
+      AppCache.clear(); // Clear old cache after fresh login
+      
       render();
     } else {
       toast(res.message);
@@ -165,6 +294,7 @@ async function login() {
 function logout() {
   if (confirm('Yakin mau logout?')) {
     localStorage.removeItem('user');
+    AppCache.clear();
     user = null;
     currentPage = 'home';
     render();
@@ -288,7 +418,7 @@ function renderModals() {
       <p class="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">Pastikan objek terlihat jelas</p>
       <div class="flex gap-2 mt-4">
         <button onclick="capture()" id="btnCapture" class="flex-1 bg-red-800 hover:bg-red-900 text-white p-3 rounded-lg font-bold transition">
-          <i class="fa-solid fa-camera mr-1"></i>Ambil Foto
+          <i class="fa-solid fa-camera mr-1"></i>Kirim Absen
         </button>
         <button onclick="closeCam()" class="bg-gray-500 hover:bg-gray-600 text-white p-3 rounded-lg transition">
           <i class="fa-solid fa-xmark"></i>
@@ -468,7 +598,6 @@ function renderPage() {
 
 function switchPage(page) {
   currentPage = page;
-  // Jangan simpan selectedMonth - biarkan reset ke bulan berjalan
   renderDashboard();
   history.pushState({ page: page }, '', '');
 }
@@ -601,68 +730,43 @@ function updateJamRealtime() {
     if (statusEl) statusEl.textContent = `Sudah kerja ${jamKerja}j ${menitKerja}m`;
   }
 }
-setInterval(updateJamRealtime, 1000);
 
 async function loadHomeStats() {
   try {
-    // Gunakan getRekapFromSheetBulanan untuk bulan saat ini
     const now = new Date();
     const month = String(now.getMonth() + 1).padStart(2, '0');
     const year = now.getFullYear();
     const bulanParam = `${month}/${year}`;
-    
-    console.log('📊 Loading home stats untuk bulan:', bulanParam);
     
     const [rekap, patroli] = await Promise.all([
       api('getRekapFromSheetBulanan', { 
         username: user.username,
         nama: user.nama,
         bulan: bulanParam 
-      }),
-      api('getPatroli', { username: user.username })
+      }, true, 120000), // Cache 2 menit
+      api('getPatroli', { username: user.username }, true, 60000) // Cache 1 menit
     ]);
-
-    console.log(' Rekap response:', rekap);
-    console.log('📥 Patroli response:', patroli);
 
     const statHadir = document.getElementById('statHadir');
     const statTelat = document.getElementById('statTelat');
     const statPatroli = document.getElementById('statPatroli');
 
     if (rekap.status === 'success' && rekap.data && statHadir) {
-      // Group data per tanggal untuk hitung hadir
       const grouped = {};
       rekap.data.forEach(item => {
-        if (!grouped[item.tanggal]) {
-          grouped[item.tanggal] = { in: null, out: null };
-        }
+        if (!grouped[item.tanggal]) grouped[item.tanggal] = { in: null, out: null };
         const ket = String(item.keterangan || '').toUpperCase();
-        if (ket === 'IN' || ket === 'MASUK') {
-          grouped[item.tanggal].in = item.jam;
-        }
-        if (ket === 'OUT' || ket === 'PULANG') {
-          grouped[item.tanggal].out = item.jam;
-        }
+        if (ket === 'IN' || ket === 'MASUK') grouped[item.tanggal].in = item.jam;
+        if (ket === 'OUT' || ket === 'PULANG') grouped[item.tanggal].out = item.jam;
       });
       
-      // Hitung hadir = yang ada jam masuk
       const hadir = Object.keys(grouped).filter(tgl => grouped[tgl].in).length;
       statHadir.textContent = hadir;
-      
-      console.log('✅ Hadir bulan ini:', hadir);
-      
-      // Hitung telat (opsional - bisa disesuaikan dengan jam masuk standar)
-      // Untuk sekarang tampilkan 0 atau hitung berdasarkan jam masuk > 08:00
-      if (statTelat) statTelat.textContent = '0';
-    } else {
-      console.warn('⚠️ Rekap error atau kosong:', rekap);
-      if (statHadir) statHadir.textContent = '0';
       if (statTelat) statTelat.textContent = '0';
     }
 
     if (patroli.status === 'success' && statPatroli) {
       statPatroli.textContent = patroli.data.length;
-      console.log('✅ Patroli bulan ini:', patroli.data.length);
 
       const aktivitasEl = document.getElementById('aktivitasTerakhir');
       if (aktivitasEl && patroli.data.length > 0) {
@@ -862,15 +966,24 @@ async function capture() {
   closeCam();
 
   if (currentCamMode === 'absen') {
+    // Optimistic UI: update tombol langsung
+    btn.innerHTML = '<i class="fa-solid fa-check mr-2"></i>Berhasil!';
+    
     const res = await api('absen', {
       username: user.username,
       tipeAbsen: currentType,
       foto: fotoBase64,
       lat: currentLocation.lat,
       long: currentLocation.long
-    });
+    }, false); // No cache untuk absen
+    
     toast(res.message);
-    if (res.status === 'success') cekStatus();
+    
+    if (res.status === 'success') {
+      // Clear status cache agar refresh otomatis
+      AppCache.clear();
+      await cekStatus(true); // Force refresh
+    }
   } else if (currentCamMode === 'patroli') {
     document.getElementById('patroliFotoBase64').value = fotoBase64;
     document.getElementById('previewPatroli').innerHTML = `<img src="${fotoBase64}" class="w-full h-full object-cover">`;
@@ -915,13 +1028,10 @@ function startTimemark() {
 // ============================================
 function renderRekap() {
   const monthOptions = generateMonthOptions();
-  
-  // SELALU set ke bulan berjalan saat masuk halaman Rekap
   selectedMonth = getCurrentMonthKey();
   
   return `
   <div class="space-y-4">
-    <!-- Header -->
     <div class="flex justify-between items-center">
       <h2 class="text-xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
         <i class="fa-solid fa-calendar-days text-red-800"></i>
@@ -932,7 +1042,6 @@ function renderRekap() {
       </button>
     </div>
 
-    <!-- Month Selector -->
     <div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700">
       <label class="text-xs font-bold text-red-800 dark:text-red-400 uppercase tracking-wide block mb-2">
         <i class="fa-regular fa-calendar mr-1"></i> Pilih Bulan
@@ -943,7 +1052,6 @@ function renderRekap() {
       </select>
     </div>
 
-    <!-- Summary Cards -->
     <div class="grid grid-cols-3 gap-3">
       <div class="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/30 dark:to-emerald-900/20 p-4 rounded-2xl border border-green-200 dark:border-green-800 text-center shadow-sm">
         <i class="fa-solid fa-circle-check text-green-600 dark:text-green-400 text-xl mb-1"></i>
@@ -962,7 +1070,6 @@ function renderRekap() {
       </div>
     </div>
 
-    <!-- Tabel Rekap -->
     <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
       <div class="px-4 py-3 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
         <p class="text-sm font-bold text-gray-700 dark:text-gray-200 flex items-center gap-2" id="rekapHeaderLabel">
@@ -986,7 +1093,7 @@ function generateMonthOptions() {
   const monthNames = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 
                       'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
   
-  const startDate = new Date(2026, 5, 1); // Mulai dari Juni 2026
+  const startDate = new Date(2026, 5, 1);
   const currentDate = new Date();
   const endDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 2, 1);
   
@@ -998,7 +1105,6 @@ function generateMonthOptions() {
     const key = `${month}_${year}`;
     const label = `${monthNames[current.getMonth()]} ${year}`;
     
-    // selectedMonth sudah di-set ke getCurrentMonthKey() di renderRekap
     months.push(`<option value="${key}" ${selectedMonth === key ? 'selected' : ''}>${label}</option>`);
     current.setMonth(current.getMonth() + 1);
   }
@@ -1022,15 +1128,10 @@ function getMonthName(monthKey) {
 
 function changeMonth(monthKey) {
   selectedMonth = monthKey;
-  
   const labelEl = document.getElementById('rekapHeaderLabel');
-  if (labelEl) {
-    labelEl.innerHTML = `<i class="fa-solid fa-table-list text-red-800"></i> Riwayat Bulan ${getMonthName(monthKey)}`;
-  }
-  
+  if (labelEl) labelEl.innerHTML = `<i class="fa-solid fa-table-list text-red-800"></i> Riwayat Bulan ${getMonthName(monthKey)}`;
   const selectEl = document.getElementById('monthSelector');
   if (selectEl) selectEl.value = monthKey;
-  
   loadRekap(monthKey);
 }
 
@@ -1038,58 +1139,27 @@ async function loadRekap(bulanKey = null) {
   const listEl = document.getElementById('listRekap');
   const countEl = document.getElementById('rekapCount');
   
-  // Pastikan user login
   if (!user) {
-    console.error('❌ User tidak login');
-    listEl.innerHTML = `
-      <div class="text-center py-8">
-        <i class="fa-solid fa-circle-exclamation text-5xl text-red-500 mb-3"></i>
-        <h3 class="font-bold text-gray-800 dark:text-white mb-1">Session Expired</h3>
-        <p class="text-sm text-gray-500 dark:text-gray-400">Silakan login ulang</p>
-      </div>
-    `;
+    listEl.innerHTML = `<div class="text-center py-8"><i class="fa-solid fa-circle-exclamation text-5xl text-red-500 mb-3"></i><h3 class="font-bold text-gray-800 dark:text-white mb-1">Session Expired</h3><p class="text-sm text-gray-500 dark:text-gray-400">Silakan login ulang</p></div>`;
     return;
   }
   
   const bulan = bulanKey || document.getElementById('monthSelector')?.value || getCurrentMonthKey();
   const [month, year] = bulan.split('_');
   const bulanParam = `${month}/${year}`;
-  
-  console.log('🔍 Loading rekap:');
-  console.log('   Bulan:', bulanParam);
-  console.log('   Username:', user.username);
-  console.log('   Nama:', user.nama);
 
-  listEl.innerHTML = `
-    <div class="text-center py-8">
-      <div class="inline-block w-10 h-10 border-4 border-red-200 border-t-red-800 rounded-full animate-spin mb-3"></div>
-      <p class="text-sm text-gray-500 dark:text-gray-400">Memuat data absensi ${getMonthName(bulan)}...</p>
-    </div>
-  `;
+  listEl.innerHTML = `<div class="text-center py-8"><div class="inline-block w-10 h-10 border-4 border-red-200 border-t-red-800 rounded-full animate-spin mb-3"></div><p class="text-sm text-gray-500 dark:text-gray-400">Memuat data absensi ${getMonthName(bulan)}...</p></div>`;
   if (countEl) countEl.textContent = '';
 
   try {
-    // Kirim username DAN nama ke backend
     const res = await api('getRekapFromSheetBulanan', {
       username: user.username,
       nama: user.nama,
       bulan: bulanParam
     });
 
-    console.log('📥 Response:', res);
-
     if (res.status === 'error') {
-      console.error('❌ Error:', res.message);
-      listEl.innerHTML = `
-        <div class="text-center py-8">
-          <i class="fa-solid fa-triangle-exclamation text-5xl text-amber-500 mb-3"></i>
-          <h3 class="font-bold text-gray-800 dark:text-white mb-1">Error</h3>
-          <p class="text-sm text-gray-500 dark:text-gray-400 mb-3">${res.message}</p>
-          <button onclick="loadRekap('${bulan}')" class="bg-red-800 text-white px-4 py-2 rounded-lg text-sm">
-            <i class="fa-solid fa-rotate-right mr-2"></i>Coba Lagi
-          </button>
-        </div>
-      `;
+      listEl.innerHTML = `<div class="text-center py-8"><i class="fa-solid fa-triangle-exclamation text-5xl text-amber-500 mb-3"></i><h3 class="font-bold text-gray-800 dark:text-white mb-1">Error</h3><p class="text-sm text-gray-500 dark:text-gray-400 mb-3">${res.message}</p><button onclick="loadRekap('${bulan}')" class="bg-red-800 text-white px-4 py-2 rounded-lg text-sm"><i class="fa-solid fa-rotate-right mr-2"></i>Coba Lagi</button></div>`;
       document.getElementById('totalHadir').textContent = '0';
       document.getElementById('totalIzin').textContent = '0';
       document.getElementById('totalAlpha').textContent = '0';
@@ -1097,37 +1167,21 @@ async function loadRekap(bulanKey = null) {
     }
 
     if (!res.data || res.data.length === 0) {
-      console.log('⚠️ Tidak ada data');
-      listEl.innerHTML = `
-        <div class="text-center py-8">
-          <i class="fa-regular fa-calendar-xmark text-6xl text-gray-300 dark:text-gray-600 mb-3"></i>
-          <h3 class="font-bold text-gray-700 dark:text-gray-300 mb-1">Belum Ada Data</h3>
-          <p class="text-sm text-gray-500 dark:text-gray-400">Belum ada riwayat absensi untuk bulan ${getMonthName(bulan)}</p>
-          <p class="text-xs text-gray-400 mt-2">Nama: ${user.nama} | Username: ${user.username}</p>
-        </div>
-      `;
+      listEl.innerHTML = `<div class="text-center py-8"><i class="fa-regular fa-calendar-xmark text-6xl text-gray-300 dark:text-gray-600 mb-3"></i><h3 class="font-bold text-gray-700 dark:text-gray-300 mb-1">Belum Ada Data</h3><p class="text-sm text-gray-500 dark:text-gray-400">Belum ada riwayat absensi untuk bulan ${getMonthName(bulan)}</p></div>`;
       document.getElementById('totalHadir').textContent = '0';
       document.getElementById('totalIzin').textContent = '0';
       document.getElementById('totalAlpha').textContent = '0';
       if (countEl) countEl.textContent = '0 hari';
       return;
     }
-
-    console.log('✅ Data ditemukan:', res.data.length, 'records');
     
-    // Group data per tanggal
     const grouped = {};
-    let totalHadir = 0;
-    let totalIzin = 0;
-    let totalAlpha = 0;
+    let totalHadir = 0, totalIzin = 0, totalAlpha = 0;
 
     res.data.forEach(item => {
       const tgl = item.tanggal;
       if (!tgl) return;
-      
-      if (!grouped[tgl]) {
-        grouped[tgl] = { in: null, out: null, status: 'Alpha' };
-      }
+      if (!grouped[tgl]) grouped[tgl] = { in: null, out: null, status: 'Alpha' };
       
       const ket = String(item.keterangan || '').toUpperCase();
       const jam = item.jam ? String(item.jam).substring(0, 5) : null;
@@ -1160,175 +1214,69 @@ async function loadRekap(bulanKey = null) {
 
     const sortedDates = Object.keys(grouped).sort((a, b) => a.localeCompare(b));
 
-    let html = `
-      <div class="overflow-x-auto -mx-4 px-4">
-        <table class="w-full text-sm min-w-[500px]">
-          <thead>
-            <tr class="bg-gradient-to-r from-red-800 to-red-900 text-white">
-              <th class="px-3 py-3 text-left font-semibold text-xs uppercase tracking-wider rounded-l-lg">
-                <i class="fa-regular fa-calendar mr-1"></i>Tanggal
-              </th>
-              <th class="px-3 py-3 text-center font-semibold text-xs uppercase tracking-wider">
-                <i class="fa-solid fa-arrow-right-to-bracket mr-1"></i>Jam Masuk
-              </th>
-              <th class="px-3 py-3 text-center font-semibold text-xs uppercase tracking-wider">
-                <i class="fa-solid fa-arrow-right-from-bracket mr-1"></i>Jam Pulang
-              </th>
-              <th class="px-3 py-3 text-center font-semibold text-xs uppercase tracking-wider rounded-r-lg">
-                <i class="fa-solid fa-circle-info mr-1"></i>Status
-              </th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
-    `;
+    let html = `<div class="overflow-x-auto -mx-4 px-4"><table class="w-full text-sm min-w-[500px]"><thead><tr class="bg-gradient-to-r from-red-800 to-red-900 text-white"><th class="px-3 py-3 text-left font-semibold text-xs uppercase tracking-wider rounded-l-lg"><i class="fa-regular fa-calendar mr-1"></i>Tanggal</th><th class="px-3 py-3 text-center font-semibold text-xs uppercase tracking-wider"><i class="fa-solid fa-arrow-right-to-bracket mr-1"></i>Jam Masuk</th><th class="px-3 py-3 text-center font-semibold text-xs uppercase tracking-wider"><i class="fa-solid fa-arrow-right-from-bracket mr-1"></i>Jam Pulang</th><th class="px-3 py-3 text-center font-semibold text-xs uppercase tracking-wider rounded-r-lg"><i class="fa-solid fa-circle-info mr-1"></i>Status</th></tr></thead><tbody class="divide-y divide-gray-100 dark:divide-gray-700">`;
 
     sortedDates.forEach((tgl, idx) => {
       const d = grouped[tgl];
-      
-      let tglFmt = tgl;
-      let dayName = '';
+      let tglFmt = tgl, dayName = '';
       try {
         const [y, m, dd] = tgl.split('-').map(Number);
         const dateObj = new Date(y, m - 1, dd);
         tglFmt = dateObj.toLocaleDateString('id-ID', { day: '2-digit', month: 'short' });
         dayName = dateObj.toLocaleDateString('id-ID', { weekday: 'short' });
-      } catch (e) {
-        tglFmt = tgl;
-      }
+      } catch (e) { tglFmt = tgl; }
 
-      let statusBadge = '';
-      let rowBg = '';
-      
+      let statusBadge = '', rowBg = '';
       if (d.status === 'Hadir') {
         if (d.in && !d.out) {
-          statusBadge = `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
-            <i class="fa-solid fa-clock text-[8px]"></i> Belum Pulang
-          </span>`;
+          statusBadge = `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300"><i class="fa-solid fa-clock text-[8px]"></i> Belum Pulang</span>`;
           rowBg = 'bg-blue-50/40 dark:bg-blue-900/10';
         } else {
-          statusBadge = `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300">
-            <i class="fa-solid fa-check text-[8px]"></i> Hadir
-          </span>`;
+          statusBadge = `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300"><i class="fa-solid fa-check text-[8px]"></i> Hadir</span>`;
           rowBg = idx % 2 === 0 ? '' : 'bg-gray-50/50 dark:bg-gray-700/20';
         }
       } else if (d.status === 'Izin') {
-        statusBadge = `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
-          <i class="fa-solid fa-file text-[8px]"></i> Izin
-        </span>`;
+        statusBadge = `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"><i class="fa-solid fa-file text-[8px]"></i> Izin</span>`;
         rowBg = 'bg-amber-50/40 dark:bg-amber-900/10';
       } else if (d.status === 'Alpha') {
-        statusBadge = `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300">
-          <i class="fa-solid fa-xmark text-[8px]"></i> Alpha
-        </span>`;
+        statusBadge = `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300"><i class="fa-solid fa-xmark text-[8px]"></i> Alpha</span>`;
         rowBg = 'bg-red-50/40 dark:bg-red-900/10';
-      } else {
-        statusBadge = `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">${d.status}</span>`;
       }
 
-      const jamMasukHtml = d.in 
-        ? `<span class="inline-flex items-center gap-1 px-2 py-1 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 rounded-md font-bold text-xs border border-green-200 dark:border-green-800">
-            <i class="fa-solid fa-right-to-bracket text-[10px]"></i>${d.in}
-          </span>`
-        : '<span class="text-gray-300 dark:text-gray-600 text-xs">—</span>';
+      const jamMasukHtml = d.in ? `<span class="inline-flex items-center gap-1 px-2 py-1 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 rounded-md font-bold text-xs border border-green-200 dark:border-green-800"><i class="fa-solid fa-right-to-bracket text-[10px]"></i>${d.in}</span>` : '<span class="text-gray-300 dark:text-gray-600 text-xs">—</span>';
+      const jamPulangHtml = d.out ? `<span class="inline-flex items-center gap-1 px-2 py-1 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 rounded-md font-bold text-xs border border-red-200 dark:border-red-800"><i class="fa-solid fa-right-from-bracket text-[10px]"></i>${d.out}</span>` : '<span class="text-gray-300 dark:text-gray-600 text-xs">—</span>';
 
-      const jamPulangHtml = d.out 
-        ? `<span class="inline-flex items-center gap-1 px-2 py-1 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 rounded-md font-bold text-xs border border-red-200 dark:border-red-800">
-            <i class="fa-solid fa-right-from-bracket text-[10px]"></i>${d.out}
-          </span>`
-        : '<span class="text-gray-300 dark:text-gray-600 text-xs">—</span>';
-
-      html += `
-        <tr class="${rowBg} hover:bg-red-50/50 dark:hover:bg-red-900/10 transition-colors">
-          <td class="px-3 py-3">
-            <div class="flex items-center gap-2">
-              <div class="w-9 h-9 rounded-lg bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400 flex flex-col items-center justify-center flex-shrink-0">
-                <span class="text-[8px] font-bold uppercase leading-none">${dayName}</span>
-                <span class="text-sm font-black leading-none mt-0.5">${tglFmt.split(' ')[0]}</span>
-              </div>
-              <div class="leading-tight">
-                <p class="font-bold text-gray-800 dark:text-white text-xs">${tglFmt}</p>
-                <p class="text-[10px] text-gray-500 dark:text-gray-400">${dayName}</p>
-              </div>
-            </div>
-          </td>
-          <td class="px-3 py-3 text-center">${jamMasukHtml}</td>
-          <td class="px-3 py-3 text-center">${jamPulangHtml}</td>
-          <td class="px-3 py-3 text-center">${statusBadge}</td>
-        </tr>
-      `;
+      html += `<tr class="${rowBg} hover:bg-red-50/50 dark:hover:bg-red-900/10 transition-colors"><td class="px-3 py-3"><div class="flex items-center gap-2"><div class="w-9 h-9 rounded-lg bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400 flex flex-col items-center justify-center flex-shrink-0"><span class="text-[8px] font-bold uppercase leading-none">${dayName}</span><span class="text-sm font-black leading-none mt-0.5">${tglFmt.split(' ')[0]}</span></div><div class="leading-tight"><p class="font-bold text-gray-800 dark:text-white text-xs">${tglFmt}</p><p class="text-[10px] text-gray-500 dark:text-gray-400">${dayName}</p></div></div></td><td class="px-3 py-3 text-center">${jamMasukHtml}</td><td class="px-3 py-3 text-center">${jamPulangHtml}</td><td class="px-3 py-3 text-center">${statusBadge}</td></tr>`;
     });
 
-    html += `
-          </tbody>
-        </table>
-      </div>
-      
-      <div class="px-4 py-3 bg-gray-50 dark:bg-gray-900/50 border-t border-gray-100 dark:border-gray-700">
-        <div class="flex items-center justify-between text-xs">
-          <span class="text-gray-500 dark:text-gray-400">
-            <i class="fa-solid fa-info-circle mr-1"></i>
-            Total ${Object.keys(grouped).length} hari tercatat
-          </span>
-          <div class="flex items-center gap-3">
-            <span class="flex items-center gap-1 text-green-600 dark:text-green-400 font-bold">
-              <span class="w-2 h-2 bg-green-500 rounded-full"></span>${totalHadir}
-            </span>
-            <span class="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-bold">
-              <span class="w-2 h-2 bg-amber-500 rounded-full"></span>${totalIzin}
-            </span>
-            <span class="flex items-center gap-1 text-red-600 dark:text-red-400 font-bold">
-              <span class="w-2 h-2 bg-red-500 rounded-full"></span>${totalAlpha}
-            </span>
-          </div>
-        </div>
-      </div>
-    `;
+    html += `</tbody></table></div><div class="px-4 py-3 bg-gray-50 dark:bg-gray-900/50 border-t border-gray-100 dark:border-gray-700"><div class="flex items-center justify-between text-xs"><span class="text-gray-500 dark:text-gray-400"><i class="fa-solid fa-info-circle mr-1"></i>Total ${Object.keys(grouped).length} hari tercatat</span><div class="flex items-center gap-3"><span class="flex items-center gap-1 text-green-600 dark:text-green-400 font-bold"><span class="w-2 h-2 bg-green-500 rounded-full"></span>${totalHadir}</span><span class="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-bold"><span class="w-2 h-2 bg-amber-500 rounded-full"></span>${totalIzin}</span><span class="flex items-center gap-1 text-red-600 dark:text-red-400 font-bold"><span class="w-2 h-2 bg-red-500 rounded-full"></span>${totalAlpha}</span></div></div></div>`;
 
     listEl.innerHTML = html;
 
   } catch (error) {
     console.error('Error loading rekap:', error);
-    listEl.innerHTML = `
-      <div class="text-center py-8">
-        <i class="fa-solid fa-circle-exclamation text-5xl text-red-500 mb-3"></i>
-        <h3 class="font-bold text-gray-800 dark:text-white mb-1">Gagal Memuat Data</h3>
-        <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">${error.message}</p>
-        <button onclick="loadRekap('${bulan}')" class="bg-red-800 hover:bg-red-900 text-white px-5 py-2 rounded-lg text-sm font-semibold transition shadow-sm">
-          <i class="fa-solid fa-rotate-right mr-2"></i>Coba Lagi
-        </button>
-      </div>
-    `;
+    listEl.innerHTML = `<div class="text-center py-8"><i class="fa-solid fa-circle-exclamation text-5xl text-red-500 mb-3"></i><h3 class="font-bold text-gray-800 dark:text-white mb-1">Gagal Memuat Data</h3><p class="text-sm text-gray-500 dark:text-gray-400 mb-4">${error.message}</p><button onclick="loadRekap('${bulan}')" class="bg-red-800 hover:bg-red-900 text-white px-5 py-2 rounded-lg text-sm font-semibold transition shadow-sm"><i class="fa-solid fa-rotate-right mr-2"></i>Coba Lagi</button></div>`;
   }
 }
 
 function animateValue(id, start, end, duration) {
   const obj = document.getElementById(id);
   if (!obj) return;
-  
   const range = end - start;
-  if (range === 0) {
-    obj.textContent = end;
-    return;
-  }
-  
+  if (range === 0) { obj.textContent = end; return; }
   const minTimer = 50;
   let stepTime = Math.abs(Math.floor(duration / range));
   stepTime = Math.max(stepTime, minTimer);
-  
   let startTime = new Date().getTime();
   let endTime = startTime + duration;
   let timer;
-  
   function run() {
     let now = new Date().getTime();
     let remaining = Math.max((endTime - now) / duration, 0);
     let value = Math.round(end - (remaining * range));
     obj.textContent = value;
-    if (value == end) {
-      clearInterval(timer);
-    }
+    if (value == end) clearInterval(timer);
   }
-  
   timer = setInterval(run, stepTime);
   run();
 }
@@ -1345,13 +1293,9 @@ function renderPatroli() {
         <i class="fa-solid fa-plus mr-1"></i>Tambah
       </button>
     </div>
-
     <div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow">
       <div id="listPatroli" class="space-y-2">
-        <div class="text-center text-gray-400 py-8">
-          <i class="fa-solid fa-spinner fa-spin text-3xl mb-2"></i>
-          <p class="text-sm">Loading data...</p>
-        </div>
+        <div class="text-center text-gray-400 py-8"><i class="fa-solid fa-spinner fa-spin text-3xl mb-2"></i><p class="text-sm">Loading data...</p></div>
       </div>
     </div>
   </div>`;
@@ -1365,34 +1309,14 @@ async function loadPatroli() {
     dataPatroli = res.data;
     listEl.innerHTML = dataPatroli.map(p => {
       const tgl = new Date(p.timestamp).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
-      return `
-        <div class="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-          <div class="flex justify-between items-start mb-2">
-            <div class="flex-1">
-              <p class="text-sm font-bold text-gray-800 dark:text-white">${p.lokasi}</p>
-              <p class="text-xs text-red-600 dark:text-red-400 font-semibold">Petugas: ${p.nama}</p>
-              <p class="text-xs text-gray-500 dark:text-gray-400">${tgl}</p>
-            </div>
-            ${p.foto ? `<img src="${p.foto}" onclick="bukaZoom('${p.foto}')" class="w-12 h-12 rounded-lg object-cover ml-2 cursor-pointer">` : ''}
-          </div>
-          <p class="text-xs text-gray-600 dark:text-gray-300">${p.keterangan || '-'}</p>
-        </div>
-      `;
+      return `<div class="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"><div class="flex justify-between items-start mb-2"><div class="flex-1"><p class="text-sm font-bold text-gray-800 dark:text-white">${p.lokasi}</p><p class="text-xs text-red-600 dark:text-red-400 font-semibold">Petugas: ${p.nama}</p><p class="text-xs text-gray-500 dark:text-gray-400">${tgl}</p></div>${p.foto ? `<img src="${p.foto}" onclick="bukaZoom('${p.foto}')" class="w-12 h-12 rounded-lg object-cover ml-2 cursor-pointer">` : ''}</div><p class="text-xs text-gray-600 dark:text-gray-300">${p.keterangan || '-'}</p></div>`;
     }).join('');
   } else {
-    listEl.innerHTML = `
-      <div class="text-center text-gray-400 py-8">
-        <i class="fa-solid fa-route text-3xl mb-2"></i>
-        <p class="text-sm">Belum ada data patroli</p>
-      </div>
-    `;
+    listEl.innerHTML = `<div class="text-center text-gray-400 py-8"><i class="fa-solid fa-route text-3xl mb-2"></i><p class="text-sm">Belum ada data patroli</p></div>`;
   }
 }
 
-function openFormPatroli() {
-  document.getElementById('modalPatroli').classList.replace('hidden', 'flex');
-}
-
+function openFormPatroli() { document.getElementById('modalPatroli').classList.replace('hidden', 'flex'); }
 function closeFormPatroli() {
   document.getElementById('modalPatroli').classList.replace('flex', 'hidden');
   document.getElementById('patroliLokasi').value = '';
@@ -1410,26 +1334,12 @@ async function simpanPatroli() {
   const ket = document.getElementById('patroliKet').value.trim();
   const fotoBase64 = document.getElementById('patroliFotoBase64').value;
 
-  if (!lokasi) {
-    toast('Lokasi wajib diisi');
-    btn.disabled = false;
-    btn.innerHTML = 'Simpan Patroli';
-    return;
-  }
-  if (!fotoBase64) {
-    toast('Foto bukti wajib diambil');
-    btn.disabled = false;
-    btn.innerHTML = 'Simpan Patroli';
-    return;
-  }
+  if (!lokasi) { toast('Lokasi wajib diisi'); btn.disabled = false; btn.innerHTML = 'Simpan Patroli'; return; }
+  if (!fotoBase64) { toast('Foto bukti wajib diambil'); btn.disabled = false; btn.innerHTML = 'Simpan Patroli'; return; }
 
   const res = await api('tambahPatroli', {
-    username: user.username,
-    lokasi: lokasi,
-    keterangan: ket,
-    foto: fotoBase64,
-    lat: currentLocation.lat,
-    long: currentLocation.long
+    username: user.username, lokasi, keterangan: ket, foto: fotoBase64,
+    lat: currentLocation.lat, long: currentLocation.long
   });
 
   if (res.status === 'success') {
@@ -1439,7 +1349,6 @@ async function simpanPatroli() {
   } else {
     toast(res.message);
   }
-
   btn.disabled = false;
   btn.innerHTML = 'Simpan Patroli';
 }
@@ -1456,13 +1365,9 @@ function renderKejadian() {
         <i class="fa-solid fa-plus mr-1"></i>Lapor
       </button>
     </div>
-
     <div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow">
       <div id="listKejadian" class="space-y-2">
-        <div class="text-center text-gray-400 py-8">
-          <i class="fa-solid fa-spinner fa-spin text-3xl mb-2"></i>
-          <p class="text-sm">Loading data...</p>
-        </div>
+        <div class="text-center text-gray-400 py-8"><i class="fa-solid fa-spinner fa-spin text-3xl mb-2"></i><p class="text-sm">Loading data...</p></div>
       </div>
     </div>
   </div>`;
@@ -1476,34 +1381,14 @@ async function loadKejadian() {
     dataKejadian = res.data;
     listEl.innerHTML = dataKejadian.map(k => {
       const tgl = new Date(k.timestamp).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
-      return `
-        <div class="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-          <div class="flex justify-between items-start mb-2">
-            <div class="flex-1">
-              <p class="text-sm font-bold text-red-600">${k.jenis}</p>
-              <p class="text-xs text-red-600 dark:text-red-400 font-semibold">Pelapor: ${k.nama}</p>
-              <p class="text-xs text-gray-500 dark:text-gray-400">${tgl} - ${k.lokasi}</p>
-            </div>
-            ${k.foto ? `<img src="${k.foto}" onclick="bukaZoom('${k.foto}')" class="w-12 h-12 rounded-lg object-cover ml-2 cursor-pointer">` : ''}
-          </div>
-          <p class="text-xs text-gray-600 dark:text-gray-300">${k.kronologi}</p>
-        </div>
-      `;
+      return `<div class="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"><div class="flex justify-between items-start mb-2"><div class="flex-1"><p class="text-sm font-bold text-red-600">${k.jenis}</p><p class="text-xs text-red-600 dark:text-red-400 font-semibold">Pelapor: ${k.nama}</p><p class="text-xs text-gray-500 dark:text-gray-400">${tgl} - ${k.lokasi}</p></div>${k.foto ? `<img src="${k.foto}" onclick="bukaZoom('${k.foto}')" class="w-12 h-12 rounded-lg object-cover ml-2 cursor-pointer">` : ''}</div><p class="text-xs text-gray-600 dark:text-gray-300">${k.kronologi}</p></div>`;
     }).join('');
   } else {
-    listEl.innerHTML = `
-      <div class="text-center text-gray-400 py-8">
-        <i class="fa-solid fa-triangle-exclamation text-3xl mb-2"></i>
-        <p class="text-sm">Belum ada laporan kejadian</p>
-      </div>
-    `;
+    listEl.innerHTML = `<div class="text-center text-gray-400 py-8"><i class="fa-solid fa-triangle-exclamation text-3xl mb-2"></i><p class="text-sm">Belum ada laporan kejadian</p></div>`;
   }
 }
 
-function openFormKejadian() {
-  document.getElementById('modalKejadian').classList.replace('hidden', 'flex');
-}
-
+function openFormKejadian() { document.getElementById('modalKejadian').classList.replace('hidden', 'flex'); }
 function closeFormKejadian() {
   document.getElementById('modalKejadian').classList.replace('flex', 'hidden');
   document.getElementById('kejadianJenis').value = '';
@@ -1523,27 +1408,12 @@ async function simpanKejadian() {
   const kronologi = document.getElementById('kejadianKronologi').value.trim();
   const fotoBase64 = document.getElementById('kejadianFotoBase64').value;
 
-  if (!jenis || !lokasi || !kronologi) {
-    toast('Jenis, Lokasi, dan Kronologi wajib diisi');
-    btn.disabled = false;
-    btn.innerHTML = 'Kirim Laporan';
-    return;
-  }
-  if (!fotoBase64) {
-    toast('Foto bukti wajib diambil');
-    btn.disabled = false;
-    btn.innerHTML = 'Kirim Laporan';
-    return;
-  }
+  if (!jenis || !lokasi || !kronologi) { toast('Jenis, Lokasi, dan Kronologi wajib diisi'); btn.disabled = false; btn.innerHTML = 'Kirim Laporan'; return; }
+  if (!fotoBase64) { toast('Foto bukti wajib diambil'); btn.disabled = false; btn.innerHTML = 'Kirim Laporan'; return; }
 
   const res = await api('tambahKejadian', {
-    username: user.username,
-    jenis: jenis,
-    lokasi: lokasi,
-    kronologi: kronologi,
-    foto: fotoBase64,
-    lat: currentLocation.lat,
-    long: currentLocation.long
+    username: user.username, jenis, lokasi, kronologi, foto: fotoBase64,
+    lat: currentLocation.lat, long: currentLocation.long
   });
 
   if (res.status === 'success') {
@@ -1553,7 +1423,6 @@ async function simpanKejadian() {
   } else {
     toast(res.message);
   }
-
   btn.disabled = false;
   btn.innerHTML = 'Kirim Laporan';
 }
@@ -1570,13 +1439,9 @@ function renderPembinaan() {
         <i class="fa-solid fa-plus mr-1"></i>Tambah
       </button>
     </div>
-
     <div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow">
       <div id="listPembinaan" class="space-y-2">
-        <div class="text-center text-gray-400 py-8">
-          <i class="fa-solid fa-spinner fa-spin text-3xl mb-2"></i>
-          <p class="text-sm">Loading data...</p>
-        </div>
+        <div class="text-center text-gray-400 py-8"><i class="fa-solid fa-spinner fa-spin text-3xl mb-2"></i><p class="text-sm">Loading data...</p></div>
       </div>
     </div>
   </div>`;
@@ -1590,35 +1455,14 @@ async function loadPembinaan() {
     dataPembinaan = res.data;
     listEl.innerHTML = dataPembinaan.map(p => {
       const tgl = new Date(p.timestamp).toLocaleDateString('id-ID', { day: '2-digit', month: 'short' });
-      return `
-        <div class="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-          <div class="flex justify-between items-start mb-2">
-            <div class="flex-1">
-              <p class="text-sm font-bold text-gray-800 dark:text-white">${p.materi}</p>
-              <p class="text-xs text-gray-500 dark:text-gray-400">${tgl} - ${p.pelatih}</p>
-            </div>
-            <div class="bg-red-800 text-white px-3 py-1 rounded-full">
-              <p class="text-sm font-bold">${p.nilai}</p>
-            </div>
-          </div>
-          <p class="text-xs text-gray-600 dark:text-gray-300">${p.keterangan || '-'}</p>
-        </div>
-      `;
+      return `<div class="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"><div class="flex justify-between items-start mb-2"><div class="flex-1"><p class="text-sm font-bold text-gray-800 dark:text-white">${p.materi}</p><p class="text-xs text-gray-500 dark:text-gray-400">${tgl} - ${p.pelatih}</p></div><div class="bg-red-800 text-white px-3 py-1 rounded-full"><p class="text-sm font-bold">${p.nilai}</p></div></div><p class="text-xs text-gray-600 dark:text-gray-300">${p.keterangan || '-'}</p></div>`;
     }).join('');
   } else {
-    listEl.innerHTML = `
-      <div class="text-center text-gray-400 py-8">
-        <i class="fa-solid fa-user-graduate text-3xl mb-2"></i>
-        <p class="text-sm">Belum ada data pembinaan</p>
-      </div>
-    `;
+    listEl.innerHTML = `<div class="text-center text-gray-400 py-8"><i class="fa-solid fa-user-graduate text-3xl mb-2"></i><p class="text-sm">Belum ada data pembinaan</p></div>`;
   }
 }
 
-function openFormPembinaan() {
-  document.getElementById('modalPembinaan').classList.replace('hidden', 'flex');
-}
-
+function openFormPembinaan() { document.getElementById('modalPembinaan').classList.replace('hidden', 'flex'); }
 function closeFormPembinaan() {
   document.getElementById('modalPembinaan').classList.replace('flex', 'hidden');
   document.getElementById('pembinaanMateri').value = '';
@@ -1637,19 +1481,10 @@ async function simpanPembinaan() {
   const nilai = document.getElementById('pembinaanNilai').value;
   const ket = document.getElementById('pembinaanKet').value.trim();
 
-  if (!materi || !pelatih || !nilai) {
-    toast('Materi, Pelatih, dan Nilai wajib diisi');
-    btn.disabled = false;
-    btn.innerHTML = 'Simpan';
-    return;
-  }
+  if (!materi || !pelatih || !nilai) { toast('Materi, Pelatih, dan Nilai wajib diisi'); btn.disabled = false; btn.innerHTML = 'Simpan'; return; }
 
   const res = await api('tambahPembinaan', {
-    username: user.username,
-    materi: materi,
-    pelatih: pelatih,
-    nilai: nilai,
-    keterangan: ket
+    username: user.username, materi, pelatih, nilai, keterangan: ket
   });
 
   if (res.status === 'success') {
@@ -1659,7 +1494,6 @@ async function simpanPembinaan() {
   } else {
     toast(res.message);
   }
-
   btn.disabled = false;
   btn.innerHTML = 'Simpan';
 }
@@ -1691,7 +1525,7 @@ function dapatkanLokasiGPS() {
         const lokasiEl = document.getElementById('lokasiStatus');
         if (lokasiEl) lokasiEl.textContent = 'GPS off';
         const gpsEl = document.getElementById('previewGps');
-        if (gpsEl) gpsEl.innerText = `⚠ ${currentLocation.alamat}`;
+        if (gpsEl) gpsEl.innerText = ` ${currentLocation.alamat}`;
       },
       { enableHighAccuracy: true, timeout: 20000 }
     );
@@ -1798,11 +1632,14 @@ async function gantiPassword() {
 // ============================================
 // API & STATUS
 // ============================================
-async function cekStatus() {
+async function cekStatus(forceRefresh = false) {
   try {
-    const res = await api('cekStatus', { username: user.username });
+    const res = await api('cekStatus', { username: user.username }, !forceRefresh, 30000);
+    
     if (res.status === 'success') {
       statusServer = res;
+      AppCache.set('statusAbsen', res, 30000);
+      
       const contentArea = document.getElementById('contentArea');
       if (contentArea && currentPage === 'home') {
         contentArea.innerHTML = renderPage();
@@ -1813,29 +1650,11 @@ async function cekStatus() {
     }
   } catch (e) {
     console.error('Cek status error:', e);
-  }
-}
-
-async function api(action, data = {}) {
-  try {
-    // Tambahkan timestamp untuk bypass cache
-    const url = URL_GAS + '?t=' + Date.now();
-    
-    const res = await fetch(url, {
-      method: 'POST',
-      // JANGAN gunakan headers Content-Type - GAS akan otomatis parse
-      body: JSON.stringify({ action, ...data })
-    });
-    
-    if (!res.ok) {
-      throw new Error('HTTP error! status: ' + res.status);
+    const cached = AppCache.get('statusAbsen');
+    if (cached) {
+      statusServer = cached;
+      console.log(' Using cached status');
     }
-    
-    return await res.json();
-  } catch (e) {
-    console.error('API Error:', e);
-    toast('Koneksi gagal: ' + e.message);
-    return { status: 'error', message: e.message };
   }
 }
 
