@@ -2,18 +2,18 @@
 <html lang="id">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Absensi Karyawan absEnQ</title>
 
-<!-- PWA Manifest -->
+<!-- OPTIMASI KECEPATAN: Preconnect ke server GAS -->
+<link rel="preconnect" href="https://script.google.com">
+<link rel="preconnect" href="https://script.googleusercontent.com">
+
+<!-- PWA Manifest & Icons -->
 <link rel="manifest" href="./manifest.json">
 <meta name="theme-color" content="#800000">
-
-<!-- Icons -->
 <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
 <link rel="apple-touch-icon" href="./icon-192.png">
-
-<!-- iOS PWA Support -->
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Absensi">
@@ -25,159 +25,80 @@ tailwind.config = {
   darkMode: 'class',
   theme: {
     extend: {
-      colors: {
-        'maroon': '#800000',
-        'maroon-dark': '#5c0000',
-      }
+      colors: { 'maroon': '#800000', 'maroon-dark': '#5c0000' }
     }
   }
 }
 </script>
-
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
 <style>
   video, #canvas { object-fit: cover; }
   * { -webkit-tap-highlight-color: transparent; }
   
-  /* ==================== REKAP ABSENSI STYLES ==================== */
-
-/* Table Container */
-.table-responsive {
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: thin;
-}
-
-.table-responsive::-webkit-scrollbar {
-  height: 6px;
-}
-
-.table-responsive::-webkit-scrollbar-track {
-  background: #f1f1f1;
-  border-radius: 3px;
-}
-
-.dark .table-responsive::-webkit-scrollbar-track {
-  background: #374151;
-}
-
-.table-responsive::-webkit-scrollbar-thumb {
-  background: #dc2626;
-  border-radius: 3px;
-}
-
-/* Table Header Animation */
-.attendance-table thead th {
-  position: relative;
-  overflow: hidden;
-}
-
-.attendance-table thead th::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-  animation: shimmer 3s infinite;
-}
-
-@keyframes shimmer {
-  0% { left: -100%; }
-  100% { left: 100%; }
-}
-
-/* Status Badge Hover */
-.status-badge {
-  transition: transform 0.2s ease;
-}
-
-.status-badge:hover {
-  transform: scale(1.05);
-}
-
-/* Summary Cards Animation */
-@keyframes countUp {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-#totalHadir, #totalIzin, #totalAlpha {
-  animation: countUp 0.5s ease-out;
-}
-
-/* Table Row Entrance Animation */
-.attendance-table tbody tr {
-  animation: fadeInRow 0.3s ease-out;
-  animation-fill-mode: both;
-}
-
-@keyframes fadeInRow {
-  from { opacity: 0; transform: translateX(-10px); }
-  to { opacity: 1; transform: translateX(0); }
-}
-
-/* Stagger animation for rows */
-.attendance-table tbody tr:nth-child(1) { animation-delay: 0.02s; }
-.attendance-table tbody tr:nth-child(2) { animation-delay: 0.04s; }
-.attendance-table tbody tr:nth-child(3) { animation-delay: 0.06s; }
-.attendance-table tbody tr:nth-child(4) { animation-delay: 0.08s; }
-.attendance-table tbody tr:nth-child(5) { animation-delay: 0.10s; }
-
-/* Month Selector Focus */
-.month-selector select {
-  transition: all 0.2s ease;
-}
-
-.month-selector select:focus {
-  box-shadow: 0 0 0 3px rgba(128, 0, 0, 0.1);
-}
-
-/* Responsive Adjustments */
-@media (max-width: 640px) {
-  .attendance-table th,
-  .attendance-table td {
-    padding: 10px 8px;
-    font-size: 12px;
+  /* SKELETON LOADING ANIMATION (Muncul instan sebelum data dimuat) */
+  .skeleton {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: 0.5rem;
   }
+  .dark .skeleton {
+    background: linear-gradient(90deg, #374151 25%, #4b5563 50%, #374151 75%);
+    background-size: 200% 100%;
+  }
+  @keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
+  /* REKAP ABSENSI STYLES */
+  .table-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: thin; }
+  .table-responsive::-webkit-scrollbar { height: 6px; }
+  .table-responsive::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 3px; }
+  .dark .table-responsive::-webkit-scrollbar-track { background: #374151; }
+  .table-responsive::-webkit-scrollbar-thumb { background: #dc2626; border-radius: 3px; }
   
-  .status-badge {
-    padding: 4px 8px;
-    font-size: 10px;
-    min-width: 70px;
+  .attendance-table thead th { position: relative; overflow: hidden; }
+  .attendance-table thead th::after {
+    content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+    animation: shimmerTable 3s infinite;
   }
+  @keyframes shimmerTable { 0% { left: -100%; } 100% { left: 100%; } }
   
-  #totalHadir, #totalIzin, #totalAlpha {
-    font-size: 1.5rem;
-  }
-}
-
-/* Print Styles */
-@media print {
-  .attendance-table {
-    box-shadow: none !important;
-    border: 1px solid #000;
-  }
+  .status-badge { transition: transform 0.2s ease; }
+  .status-badge:hover { transform: scale(1.05); }
   
-  .attendance-table thead {
-    background: #800000 !important;
-    color: white !important;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
+  @media (max-width: 640px) {
+    .attendance-table th, .attendance-table td { padding: 10px 8px; font-size: 12px; }
+    .status-badge { padding: 4px 8px; font-size: 10px; min-width: 70px; }
   }
-  
-  nav, button, .month-selector {
-    display: none !important;
+  @media print {
+    .attendance-table { box-shadow: none !important; border: 1px solid #000; }
+    .attendance-table thead { background: #800000 !important; color: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    nav, button, .month-selector { display: none !important; }
   }
-}
 </style>
 </head>
 
 <body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white transition">
 
-<div id="app"></div>
+<!-- SKELETON SCREEN (Tampil instan saat app dibuka) -->
+<div id="skeleton-screen" class="fixed inset-0 bg-gray-50 dark:bg-gray-900 z-50 p-4 space-y-4 flex flex-col items-center justify-center">
+  <div class="skeleton h-16 w-full max-w-md mb-6 rounded-xl"></div>
+  <div class="skeleton h-32 w-full max-w-md rounded-2xl mb-4"></div>
+  <div class="grid grid-cols-2 gap-4 w-full max-w-md mb-4">
+    <div class="skeleton h-24 w-full rounded-2xl"></div>
+    <div class="skeleton h-24 w-full rounded-2xl"></div>
+  </div>
+  <div class="skeleton h-12 w-3/4 max-w-md rounded-xl mb-4"></div>
+  <div class="skeleton h-12 w-3/4 max-w-md rounded-xl"></div>
+</div>
+
+<div id="app" class="hidden min-h-screen pb-24">
+  <!-- Konten utama akan di-render oleh app.js -->
+</div>
 
 <!-- POPUP INSTALL PWA -->
 <div id="installPopup" class="fixed inset-0 bg-black/90 backdrop-blur-sm hidden items-center justify-center p-4 z-[999]">
@@ -186,7 +107,7 @@ tailwind.config = {
       <i class="fa-solid fa-download text-white text-3xl"></i>
     </div>
     <h3 class="text-xl font-black text-gray-900 dark:text-white mb-2">Install Aplikasi</h3>
-    <p class="text-sm text-gray-600 dark:text-gray-400 mb-6">Install aplikasi untuk pengalaman yang lebih baik</p>
+    <p class="text-sm text-gray-600 dark:text-gray-400 mb-6">Install untuk akses lebih cepat & pengalaman offline</p>
     <button id="btnInstallAndroid" class="w-full bg-red-800 hover:bg-red-900 text-white py-4 rounded-2xl font-bold text-lg shadow-xl transition">
       <i class="fa-solid fa-download mr-2"></i>Install Sekarang
     </button>
@@ -194,8 +115,8 @@ tailwind.config = {
   </div>
 </div>
 
-<!-- Load app.js -->
-<script src="./app.js"></script>
+<!-- Load app.js dengan defer agar tidak memblokir rendering -->
+<script src="./app.js" defer></script>
 
 <!-- Modal Zoom -->
 <div id="modalZoom" class="fixed inset-0 bg-black/90 hidden items-center justify-center p-4 z-[9999]" onclick="tutupZoom()">
@@ -209,11 +130,9 @@ function bukaZoom(url) {
   document.getElementById('modalZoom').classList.remove('hidden');
   document.getElementById('modalZoom').classList.add('flex');
 }
-
 function tutupZoom() {
   document.getElementById('modalZoom').classList.add('hidden');
 }
 </script>
-
 </body>
 </html>
