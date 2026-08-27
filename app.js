@@ -2,11 +2,75 @@
 // KONFIGURASI & VARIABEL GLOBAL
 // ============================================
 const URL_GAS = 'https://script.google.com/macros/s/AKfycbzCy0IA8NAf2m9Bd90QNAEmIwVi_euT37Ut0_-hlZKk563vtpV3xVV0GFIHMbswsSny/exec';
-console.log(' App.js loaded - v2.0 OPTIMIZED with Cache');
+console.log('🚀 App.js loaded - v2.1.0 with Auto-Update');
+
+// ============================================
+// SISTEM AUTO-UPDATE & FORCE RE-LOGIN
+// ============================================
+// ️ PENTING: Ubah angka versi ini (misal jadi '2.1.1') setiap kali Anda mengupdate fitur besar di GitHub!
+const APP_VERSION = '2.1.0'; 
+
+function checkAppVersion() {
+  const savedVersion = localStorage.getItem('absenq_app_version');
+  
+  // Jika versi di HP user berbeda dengan versi terbaru di GitHub
+  if (savedVersion !== APP_VERSION) {
+    console.log(`🔄 Update terdeteksi! Versi lama: ${savedVersion}, Versi baru: ${APP_VERSION}`);
+    
+    // 1. Hapus session user dan cache lama agar tidak bentrok
+    localStorage.removeItem('user');
+    Object.keys(localStorage).forEach(k => {
+      if (k.startsWith('absenq_')) localStorage.removeItem(k);
+    });
+    
+    // 2. Tampilkan pesan ke user
+    showUpdateModal();
+    
+    // 3. Simpan versi baru
+    localStorage.setItem('absenq_app_version', APP_VERSION);
+    
+    // 4. Paksa reload halaman setelah 3 detik
+    setTimeout(() => {
+      window.location.reload(true); // true = bypass cache browser
+    }, 3000);
+    
+    return false; // Berhenti, jangan lanjutkan load app
+  }
+  return true; // Versi sama, lanjutkan normal
+}
+
+function showUpdateModal() {
+  if (document.getElementById('modalUpdate')) return;
+
+  const modal = document.createElement('div');
+  modal.id = 'modalUpdate';
+  modal.className = 'fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-[99999]';
+  modal.innerHTML = `
+    <div class="bg-white dark:bg-gray-800 rounded-3xl p-6 w-full max-w-sm text-center shadow-2xl transform transition-all">
+      <div class="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full mx-auto flex items-center justify-center mb-4">
+        <i class="fa-solid fa-rotate fa-spin text-green-600 dark:text-green-400 text-2xl"></i>
+      </div>
+      <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-2">Aplikasi Diperbarui!</h3>
+      <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+        Kami telah meningkatkan performa aplikasi. Silakan login ulang untuk menikmati fitur terbaru.
+      </p>
+      <p class="text-xs text-gray-400">Memuat ulang secara otomatis dalam 3 detik...</p>
+    </div>
+  `;
+  document.body.appendChild(modal);
+}
+
+// Jalankan pengecekan versi SEBELUM app di-inisialisasi
+const isLatestVersion = checkAppVersion();
+
+// Jika versi lama, hentikan eksekusi script di bawah ini sampai reload
+if (!isLatestVersion) {
+  throw new Error('Menunggu reload untuk update...');
+}
 
 // === SISTEM CACHE LOKAL (KUNCI KECEPATAN) ===
 const AppCache = {
-  set: (key, data, ttl = 300000) => { // TTL default 5 menit
+  set: (key, data, ttl = 300000) => { 
     try {
       const item = { data, expiry: Date.now() + ttl, timestamp: Date.now() };
       localStorage.setItem('absenq_' + key, JSON.stringify(item));
@@ -35,17 +99,15 @@ const AppCache = {
 async function api(action, data = {}, useCache = true, cacheTTL = 60000) {
   const cacheKey = `${action}_${JSON.stringify(data)}`;
   
-  // 1. Cek cache dulu (INSTAN!)
   if (useCache) {
     const cached = AppCache.get(cacheKey);
     if (cached) return cached;
   }
   
-  // 2. Fetch dari server jika tidak ada di cache
   try {
-    const url = URL_GAS + '?t=' + Date.now(); // Bypass browser cache
+    const url = URL_GAS + '?t=' + Date.now(); 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+    const timeoutId = setTimeout(() => controller.abort(), 15000); 
     
     const res = await fetch(url, {
       method: 'POST',
@@ -58,7 +120,6 @@ async function api(action, data = {}, useCache = true, cacheTTL = 60000) {
     
     const result = await res.json();
     
-    // 3. Simpan ke cache jika sukses
     if (useCache && result.status === 'success') {
       AppCache.set(cacheKey, result, cacheTTL);
     }
@@ -66,13 +127,10 @@ async function api(action, data = {}, useCache = true, cacheTTL = 60000) {
     return result;
   } catch (e) {
     console.error(`❌ API ${action} failed:`, e.message);
-    
-    // Fallback: gunakan data lama dari cache jika ada
     if (useCache) {
       const oldCached = AppCache.get(cacheKey);
       if (oldCached) return oldCached;
     }
-    
     return { status: 'error', message: 'Koneksi gagal: ' + e.message };
   }
 }
@@ -82,7 +140,7 @@ async function testConnection() {
   try {
     console.log('🔍 Testing connection to GAS...');
     const startTime = Date.now();
-    const response = await api('test', {}, false); // No cache for test
+    const response = await api('test', {}, false); 
     console.log(`✅ Connection OK in ${Date.now() - startTime}ms:`, response);
   } catch (err) {
     console.error('❌ Connection FAILED:', err);
@@ -107,7 +165,6 @@ let dataPembinaan = [];
 let selectedMonth = '';
 let isOnline = navigator.onLine;
 
-// Detect online/offline status
 window.addEventListener('online', () => { 
   isOnline = true; 
   if (user) syncDataInBackground();
@@ -130,7 +187,7 @@ const isInStandalone = () => window.matchMedia('(display-mode: standalone)').mat
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   deferredPrompt = e;
-  if (!isInStandalone()) {
+  if (!isInStandalone() && installPopup) {
     installPopup.classList.remove('hidden');
     installPopup.classList.add('flex');
   }
@@ -154,7 +211,6 @@ const app = document.getElementById('app');
 async function initApp() {
   console.log('🚀 Initializing app...');
   
-  // 1. Tampilkan UI dari cache INSTAN (< 50ms)
   const cachedUser = AppCache.get('currentUser');
   const cachedStatus = AppCache.get('statusAbsen');
   
@@ -168,28 +224,22 @@ async function initApp() {
     console.log('✅ Loaded status from cache');
   }
   
-  // 2. Render UI immediately & sembunyikan skeleton
   if (!user) {
     renderLogin();
   } else {
     renderDashboard();
-    
-    // 3. Background sync (tidak blocking UI)
     if (isOnline) {
       syncDataInBackground();
     }
   }
   
-  // Sembunyikan skeleton, tampilkan app
   document.getElementById('skeleton-screen').classList.add('hidden');
-  document.getElementById('app').classList.remove('hidden');
+  if(app) document.getElementById('app').classList.remove('hidden');
   
-  // 4. Start GPS & Clock
   dapatkanLokasiGPS();
   setInterval(updateJamRealtime, 1000);
 }
 
-// === BACKGROUND SYNC (Non-blocking) ===
 async function syncDataInBackground() {
   if (!user || !isOnline) return;
   
@@ -270,13 +320,13 @@ async function login() {
   btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>Memproses...';
   
   try {
-    const res = await api('login', { username, password }, false); // No cache for login
+    const res = await api('login', { username, password }, false); 
     
     if (res.status === 'success') {
       user = res;
       localStorage.setItem('user', JSON.stringify(user));
       AppCache.set('currentUser', res, 3600000);
-      AppCache.clear(); // Clear old cache after fresh login
+      AppCache.clear(); 
       
       render();
     } else {
@@ -317,7 +367,8 @@ function toggleDark() {
   isDark = !isDark;
   localStorage.setItem('dark', isDark);
   document.documentElement.classList.toggle('dark');
-  document.getElementById('darkIcon').className = `fa-solid ${isDark ? 'fa-sun' : 'fa-moon'} text-xl`;
+  const icon = document.getElementById('darkIcon');
+  if(icon) icon.className = `fa-solid ${isDark ? 'fa-sun' : 'fa-moon'} text-xl`;
 }
 
 function toast(msg) {
@@ -332,6 +383,7 @@ function toast(msg) {
 // DASHBOARD & NAVIGATION
 // ============================================
 function renderDashboard() {
+  if(!app) return;
   app.innerHTML = `
   <nav class="bg-red-800 text-white p-4 flex justify-between items-center shadow-lg sticky top-0 z-10">
     <div class="flex items-center gap-3">
@@ -399,7 +451,6 @@ function renderDashboard() {
 
 function renderModals() {
   return `
-  <!-- MODAL KAMERA -->
   <div id="modalCam" class="fixed inset-0 bg-black/90 hidden items-center justify-center p-4 z-[70]">
     <div class="bg-white dark:bg-gray-800 rounded-2xl p-4 w-full max-w-md">
       <h3 class="font-bold text-lg mb-3 text-red-800 dark:text-white text-center">
@@ -427,7 +478,6 @@ function renderModals() {
     </div>
   </div>
 
-  <!-- MODAL PROFIL -->
   <div id="modalProfil" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
     <div class="bg-white dark:bg-gray-900 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl">
       <div class="bg-red-800 px-5 pt-8 pb-6 relative">
@@ -464,7 +514,6 @@ function renderModals() {
     </div>
   </div>
 
-  <!-- MODAL EDIT PROFIL -->
   <div id="modalEditProfil" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4 z-[60]">
     <div class="bg-white dark:bg-gray-900 rounded-3xl w-full max-w-md max-h-[90vh] flex flex-col shadow-2xl">
       <div class="bg-red-800 px-5 py-4 rounded-t-3xl flex items-center justify-between">
@@ -486,7 +535,6 @@ function renderModals() {
     </div>
   </div>
 
-  <!-- MODAL GANTI PASSWORD -->
   <div id="modalGantiPassword" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4 z-[60]">
     <div class="bg-white dark:bg-gray-900 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl">
       <div class="bg-red-800 px-5 py-4 flex items-center justify-between">
@@ -501,7 +549,6 @@ function renderModals() {
     </div>
   </div>
 
-  <!-- MODAL INPUT PATROLI -->
   <div id="modalPatroli" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4 z-[60]">
     <div class="bg-white dark:bg-gray-900 rounded-3xl w-full max-w-md max-h-[90vh] flex flex-col shadow-2xl">
       <div class="bg-red-800 px-5 py-4 rounded-t-3xl flex items-center justify-between">
@@ -529,7 +576,6 @@ function renderModals() {
     </div>
   </div>
 
-  <!-- MODAL INPUT KEJADIAN -->
   <div id="modalKejadian" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4 z-[60]">
     <div class="bg-white dark:bg-gray-900 rounded-3xl w-full max-w-md max-h-[90vh] flex flex-col shadow-2xl">
       <div class="bg-red-800 px-5 py-4 rounded-t-3xl flex items-center justify-between">
@@ -567,7 +613,6 @@ function renderModals() {
     </div>
   </div>
 
-  <!-- MODAL INPUT PEMBINAAN -->
   <div id="modalPembinaan" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4 z-[60]">
     <div class="bg-white dark:bg-gray-900 rounded-3xl w-full max-w-md max-h-[90vh] flex flex-col shadow-2xl">
       <div class="bg-red-800 px-5 py-4 rounded-t-3xl flex items-center justify-between">
@@ -743,8 +788,8 @@ async function loadHomeStats() {
         username: user.username,
         nama: user.nama,
         bulan: bulanParam 
-      }, true, 120000), // Cache 2 menit
-      api('getPatroli', { username: user.username }, true, 60000) // Cache 1 menit
+      }, true, 120000), 
+      api('getPatroli', { username: user.username }, true, 60000) 
     ]);
 
     const statHadir = document.getElementById('statHadir');
@@ -966,7 +1011,6 @@ async function capture() {
   closeCam();
 
   if (currentCamMode === 'absen') {
-    // Optimistic UI: update tombol langsung
     btn.innerHTML = '<i class="fa-solid fa-check mr-2"></i>Berhasil!';
     
     const res = await api('absen', {
@@ -975,14 +1019,13 @@ async function capture() {
       foto: fotoBase64,
       lat: currentLocation.lat,
       long: currentLocation.long
-    }, false); // No cache untuk absen
+    }, false); 
     
     toast(res.message);
     
     if (res.status === 'success') {
-      // Clear status cache agar refresh otomatis
       AppCache.clear();
-      await cekStatus(true); // Force refresh
+      await cekStatus(true); 
     }
   } else if (currentCamMode === 'patroli') {
     document.getElementById('patroliFotoBase64').value = fotoBase64;
@@ -1024,7 +1067,7 @@ function startTimemark() {
 }
 
 // ============================================
-// REKAP PAGE - DENGAN FITUR PILIH BULAN
+// REKAP PAGE
 // ============================================
 function renderRekap() {
   const monthOptions = generateMonthOptions();
@@ -1090,25 +1133,19 @@ function renderRekap() {
 
 function generateMonthOptions() {
   const months = [];
-  const monthNames = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 
-                      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
-  
+  const monthNames = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
   const startDate = new Date(2026, 5, 1);
   const currentDate = new Date();
   const endDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 2, 1);
-  
   let current = new Date(startDate);
-  
   while (current <= endDate) {
     const month = String(current.getMonth() + 1).padStart(2, '0');
     const year = current.getFullYear();
     const key = `${month}_${year}`;
     const label = `${monthNames[current.getMonth()]} ${year}`;
-    
     months.push(`<option value="${key}" ${selectedMonth === key ? 'selected' : ''}>${label}</option>`);
     current.setMonth(current.getMonth() + 1);
   }
-  
   return months.join('');
 }
 
@@ -1121,8 +1158,7 @@ function getCurrentMonthKey() {
 
 function getMonthName(monthKey) {
   const [month, year] = monthKey.split('_');
-  const monthNames = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 
-                      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+  const monthNames = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
   return `${monthNames[parseInt(month) - 1]} ${year}`;
 }
 
@@ -1138,11 +1174,7 @@ function changeMonth(monthKey) {
 async function loadRekap(bulanKey = null) {
   const listEl = document.getElementById('listRekap');
   const countEl = document.getElementById('rekapCount');
-  
-  if (!user) {
-    listEl.innerHTML = `<div class="text-center py-8"><i class="fa-solid fa-circle-exclamation text-5xl text-red-500 mb-3"></i><h3 class="font-bold text-gray-800 dark:text-white mb-1">Session Expired</h3><p class="text-sm text-gray-500 dark:text-gray-400">Silakan login ulang</p></div>`;
-    return;
-  }
+  if (!user) return;
   
   const bulan = bulanKey || document.getElementById('monthSelector')?.value || getCurrentMonthKey();
   const [month, year] = bulan.split('_');
@@ -1152,11 +1184,7 @@ async function loadRekap(bulanKey = null) {
   if (countEl) countEl.textContent = '';
 
   try {
-    const res = await api('getRekapFromSheetBulanan', {
-      username: user.username,
-      nama: user.nama,
-      bulan: bulanParam
-    });
+    const res = await api('getRekapFromSheetBulanan', { username: user.username, nama: user.nama, bulan: bulanParam });
 
     if (res.status === 'error') {
       listEl.innerHTML = `<div class="text-center py-8"><i class="fa-solid fa-triangle-exclamation text-5xl text-amber-500 mb-3"></i><h3 class="font-bold text-gray-800 dark:text-white mb-1">Error</h3><p class="text-sm text-gray-500 dark:text-gray-400 mb-3">${res.message}</p><button onclick="loadRekap('${bulan}')" class="bg-red-800 text-white px-4 py-2 rounded-lg text-sm"><i class="fa-solid fa-rotate-right mr-2"></i>Coba Lagi</button></div>`;
@@ -1182,10 +1210,8 @@ async function loadRekap(bulanKey = null) {
       const tgl = item.tanggal;
       if (!tgl) return;
       if (!grouped[tgl]) grouped[tgl] = { in: null, out: null, status: 'Alpha' };
-      
       const ket = String(item.keterangan || '').toUpperCase();
       const jam = item.jam ? String(item.jam).substring(0, 5) : null;
-      
       if (ket === 'IN' || ket === 'MASUK') {
         grouped[tgl].in = jam;
         if (grouped[tgl].status === 'Alpha') grouped[tgl].status = 'Hadir';
@@ -1211,7 +1237,6 @@ async function loadRekap(bulanKey = null) {
     animateValue('totalAlpha', 0, totalAlpha, 500);
 
     if (countEl) countEl.textContent = `${Object.keys(grouped).length} hari`;
-
     const sortedDates = Object.keys(grouped).sort((a, b) => a.localeCompare(b));
 
     let html = `<div class="overflow-x-auto -mx-4 px-4"><table class="w-full text-sm min-w-[500px]"><thead><tr class="bg-gradient-to-r from-red-800 to-red-900 text-white"><th class="px-3 py-3 text-left font-semibold text-xs uppercase tracking-wider rounded-l-lg"><i class="fa-regular fa-calendar mr-1"></i>Tanggal</th><th class="px-3 py-3 text-center font-semibold text-xs uppercase tracking-wider"><i class="fa-solid fa-arrow-right-to-bracket mr-1"></i>Jam Masuk</th><th class="px-3 py-3 text-center font-semibold text-xs uppercase tracking-wider"><i class="fa-solid fa-arrow-right-from-bracket mr-1"></i>Jam Pulang</th><th class="px-3 py-3 text-center font-semibold text-xs uppercase tracking-wider rounded-r-lg"><i class="fa-solid fa-circle-info mr-1"></i>Status</th></tr></thead><tbody class="divide-y divide-gray-100 dark:divide-gray-700">`;
@@ -1250,7 +1275,6 @@ async function loadRekap(bulanKey = null) {
     });
 
     html += `</tbody></table></div><div class="px-4 py-3 bg-gray-50 dark:bg-gray-900/50 border-t border-gray-100 dark:border-gray-700"><div class="flex items-center justify-between text-xs"><span class="text-gray-500 dark:text-gray-400"><i class="fa-solid fa-info-circle mr-1"></i>Total ${Object.keys(grouped).length} hari tercatat</span><div class="flex items-center gap-3"><span class="flex items-center gap-1 text-green-600 dark:text-green-400 font-bold"><span class="w-2 h-2 bg-green-500 rounded-full"></span>${totalHadir}</span><span class="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-bold"><span class="w-2 h-2 bg-amber-500 rounded-full"></span>${totalIzin}</span><span class="flex items-center gap-1 text-red-600 dark:text-red-400 font-bold"><span class="w-2 h-2 bg-red-500 rounded-full"></span>${totalAlpha}</span></div></div></div>`;
-
     listEl.innerHTML = html;
 
   } catch (error) {
@@ -1285,26 +1309,12 @@ function animateValue(id, start, end, duration) {
 // PATROLI PAGE
 // ============================================
 function renderPatroli() {
-  return `
-  <div class="space-y-4">
-    <div class="flex justify-between items-center">
-      <h2 class="text-xl font-bold text-gray-800 dark:text-white">Patroli</h2>
-      <button onclick="openFormPatroli()" class="bg-red-800 text-white px-4 py-2 rounded-lg text-sm hover:bg-red-900 transition">
-        <i class="fa-solid fa-plus mr-1"></i>Tambah
-      </button>
-    </div>
-    <div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow">
-      <div id="listPatroli" class="space-y-2">
-        <div class="text-center text-gray-400 py-8"><i class="fa-solid fa-spinner fa-spin text-3xl mb-2"></i><p class="text-sm">Loading data...</p></div>
-      </div>
-    </div>
-  </div>`;
+  return `<div class="space-y-4"><div class="flex justify-between items-center"><h2 class="text-xl font-bold text-gray-800 dark:text-white">Patroli</h2><button onclick="openFormPatroli()" class="bg-red-800 text-white px-4 py-2 rounded-lg text-sm hover:bg-red-900 transition"><i class="fa-solid fa-plus mr-1"></i>Tambah</button></div><div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow"><div id="listPatroli" class="space-y-2"><div class="text-center text-gray-400 py-8"><i class="fa-solid fa-spinner fa-spin text-3xl mb-2"></i><p class="text-sm">Loading data...</p></div></div></div></div>`;
 }
 
 async function loadPatroli() {
   const res = await api('getPatroli', { username: user.username });
   const listEl = document.getElementById('listPatroli');
-
   if (res.status === 'success' && res.data.length > 0) {
     dataPatroli = res.data;
     listEl.innerHTML = dataPatroli.map(p => {
@@ -1327,56 +1337,27 @@ function closeFormPatroli() {
 
 async function simpanPatroli() {
   const btn = document.getElementById('btnSimpanPatroli');
-  btn.disabled = true;
-  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>Menyimpan...';
-
+  btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>Menyimpan...';
   const lokasi = document.getElementById('patroliLokasi').value.trim();
   const ket = document.getElementById('patroliKet').value.trim();
   const fotoBase64 = document.getElementById('patroliFotoBase64').value;
-
   if (!lokasi) { toast('Lokasi wajib diisi'); btn.disabled = false; btn.innerHTML = 'Simpan Patroli'; return; }
   if (!fotoBase64) { toast('Foto bukti wajib diambil'); btn.disabled = false; btn.innerHTML = 'Simpan Patroli'; return; }
-
-  const res = await api('tambahPatroli', {
-    username: user.username, lokasi, keterangan: ket, foto: fotoBase64,
-    lat: currentLocation.lat, long: currentLocation.long
-  });
-
-  if (res.status === 'success') {
-    toast(res.message);
-    closeFormPatroli();
-    loadPatroli();
-  } else {
-    toast(res.message);
-  }
-  btn.disabled = false;
-  btn.innerHTML = 'Simpan Patroli';
+  const res = await api('tambahPatroli', { username: user.username, lokasi, keterangan: ket, foto: fotoBase64, lat: currentLocation.lat, long: currentLocation.long });
+  if (res.status === 'success') { toast(res.message); closeFormPatroli(); loadPatroli(); } else { toast(res.message); }
+  btn.disabled = false; btn.innerHTML = 'Simpan Patroli';
 }
 
 // ============================================
 // KEJADIAN PAGE
 // ============================================
 function renderKejadian() {
-  return `
-  <div class="space-y-4">
-    <div class="flex justify-between items-center">
-      <h2 class="text-xl font-bold text-gray-800 dark:text-white">Laporan Kejadian</h2>
-      <button onclick="openFormKejadian()" class="bg-red-800 text-white px-4 py-2 rounded-lg text-sm hover:bg-red-900 transition">
-        <i class="fa-solid fa-plus mr-1"></i>Lapor
-      </button>
-    </div>
-    <div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow">
-      <div id="listKejadian" class="space-y-2">
-        <div class="text-center text-gray-400 py-8"><i class="fa-solid fa-spinner fa-spin text-3xl mb-2"></i><p class="text-sm">Loading data...</p></div>
-      </div>
-    </div>
-  </div>`;
+  return `<div class="space-y-4"><div class="flex justify-between items-center"><h2 class="text-xl font-bold text-gray-800 dark:text-white">Laporan Kejadian</h2><button onclick="openFormKejadian()" class="bg-red-800 text-white px-4 py-2 rounded-lg text-sm hover:bg-red-900 transition"><i class="fa-solid fa-plus mr-1"></i>Lapor</button></div><div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow"><div id="listKejadian" class="space-y-2"><div class="text-center text-gray-400 py-8"><i class="fa-solid fa-spinner fa-spin text-3xl mb-2"></i><p class="text-sm">Loading data...</p></div></div></div></div>`;
 }
 
 async function loadKejadian() {
   const res = await api('getKejadian', { username: user.username });
   const listEl = document.getElementById('listKejadian');
-
   if (res.status === 'success' && res.data.length > 0) {
     dataKejadian = res.data;
     listEl.innerHTML = dataKejadian.map(k => {
@@ -1400,57 +1381,28 @@ function closeFormKejadian() {
 
 async function simpanKejadian() {
   const btn = document.getElementById('btnSimpanKejadian');
-  btn.disabled = true;
-  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>Mengirim...';
-
+  btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>Mengirim...';
   const jenis = document.getElementById('kejadianJenis').value;
   const lokasi = document.getElementById('kejadianLokasi').value.trim();
   const kronologi = document.getElementById('kejadianKronologi').value.trim();
   const fotoBase64 = document.getElementById('kejadianFotoBase64').value;
-
   if (!jenis || !lokasi || !kronologi) { toast('Jenis, Lokasi, dan Kronologi wajib diisi'); btn.disabled = false; btn.innerHTML = 'Kirim Laporan'; return; }
   if (!fotoBase64) { toast('Foto bukti wajib diambil'); btn.disabled = false; btn.innerHTML = 'Kirim Laporan'; return; }
-
-  const res = await api('tambahKejadian', {
-    username: user.username, jenis, lokasi, kronologi, foto: fotoBase64,
-    lat: currentLocation.lat, long: currentLocation.long
-  });
-
-  if (res.status === 'success') {
-    toast(res.message);
-    closeFormKejadian();
-    loadKejadian();
-  } else {
-    toast(res.message);
-  }
-  btn.disabled = false;
-  btn.innerHTML = 'Kirim Laporan';
+  const res = await api('tambahKejadian', { username: user.username, jenis, lokasi, kronologi, foto: fotoBase64, lat: currentLocation.lat, long: currentLocation.long });
+  if (res.status === 'success') { toast(res.message); closeFormKejadian(); loadKejadian(); } else { toast(res.message); }
+  btn.disabled = false; btn.innerHTML = 'Kirim Laporan';
 }
 
 // ============================================
 // PEMBINAAN PAGE
 // ============================================
 function renderPembinaan() {
-  return `
-  <div class="space-y-4">
-    <div class="flex justify-between items-center">
-      <h2 class="text-xl font-bold text-gray-800 dark:text-white">Pembinaan</h2>
-      <button onclick="openFormPembinaan()" class="bg-red-800 text-white px-4 py-2 rounded-lg text-sm hover:bg-red-900 transition">
-        <i class="fa-solid fa-plus mr-1"></i>Tambah
-      </button>
-    </div>
-    <div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow">
-      <div id="listPembinaan" class="space-y-2">
-        <div class="text-center text-gray-400 py-8"><i class="fa-solid fa-spinner fa-spin text-3xl mb-2"></i><p class="text-sm">Loading data...</p></div>
-      </div>
-    </div>
-  </div>`;
+  return `<div class="space-y-4"><div class="flex justify-between items-center"><h2 class="text-xl font-bold text-gray-800 dark:text-white">Pembinaan</h2><button onclick="openFormPembinaan()" class="bg-red-800 text-white px-4 py-2 rounded-lg text-sm hover:bg-red-900 transition"><i class="fa-solid fa-plus mr-1"></i>Tambah</button></div><div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow"><div id="listPembinaan" class="space-y-2"><div class="text-center text-gray-400 py-8"><i class="fa-solid fa-spinner fa-spin text-3xl mb-2"></i><p class="text-sm">Loading data...</p></div></div></div></div>`;
 }
 
 async function loadPembinaan() {
   const res = await api('getPembinaan', { username: user.username });
   const listEl = document.getElementById('listPembinaan');
-
   if (res.status === 'success' && res.data.length > 0) {
     dataPembinaan = res.data;
     listEl.innerHTML = dataPembinaan.map(p => {
@@ -1473,29 +1425,15 @@ function closeFormPembinaan() {
 
 async function simpanPembinaan() {
   const btn = document.getElementById('btnSimpanPembinaan');
-  btn.disabled = true;
-  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>Menyimpan...';
-
+  btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>Menyimpan...';
   const materi = document.getElementById('pembinaanMateri').value.trim();
   const pelatih = document.getElementById('pembinaanPelatih').value.trim();
   const nilai = document.getElementById('pembinaanNilai').value;
   const ket = document.getElementById('pembinaanKet').value.trim();
-
   if (!materi || !pelatih || !nilai) { toast('Materi, Pelatih, dan Nilai wajib diisi'); btn.disabled = false; btn.innerHTML = 'Simpan'; return; }
-
-  const res = await api('tambahPembinaan', {
-    username: user.username, materi, pelatih, nilai, keterangan: ket
-  });
-
-  if (res.status === 'success') {
-    toast(res.message);
-    closeFormPembinaan();
-    loadPembinaan();
-  } else {
-    toast(res.message);
-  }
-  btn.disabled = false;
-  btn.innerHTML = 'Simpan';
+  const res = await api('tambahPembinaan', { username: user.username, materi, pelatih, nilai, keterangan: ket });
+  if (res.status === 'success') { toast(res.message); closeFormPembinaan(); loadPembinaan(); } else { toast(res.message); }
+  btn.disabled = false; btn.innerHTML = 'Simpan';
 }
 
 // ============================================
@@ -1525,7 +1463,7 @@ function dapatkanLokasiGPS() {
         const lokasiEl = document.getElementById('lokasiStatus');
         if (lokasiEl) lokasiEl.textContent = 'GPS off';
         const gpsEl = document.getElementById('previewGps');
-        if (gpsEl) gpsEl.innerText = ` ${currentLocation.alamat}`;
+        if (gpsEl) gpsEl.innerText = `⚠ ${currentLocation.alamat}`;
       },
       { enableHighAccuracy: true, timeout: 20000 }
     );
@@ -1558,7 +1496,6 @@ function gantiFotoProfil() { document.getElementById('inputFotoProfil').click();
 async function uploadFotoProfil(event) {
   const file = event.target.files[0];
   if (!file) return;
-
   const img = await createImageBitmap(file);
   const max = 600;
   const scale = Math.min(1, max / Math.max(img.width, img.height));
@@ -1567,7 +1504,6 @@ async function uploadFotoProfil(event) {
   canvas.height = img.height * scale;
   canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
   const base64 = canvas.toDataURL('image/jpeg', 0.8);
-
   document.getElementById('fotoProfil').src = base64;
   const res = await api('uploadFoto', { username: user.username, fotoBase64: base64 });
   if (res.status === 'success') {
@@ -1582,19 +1518,8 @@ async function uploadFotoProfil(event) {
 
 async function simpanProfil() {
   const btn = document.getElementById('btnSimpanProfil');
-  btn.disabled = true;
-  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>Menyimpan...';
-
-  const d = {
-    username: user.username,
-    nama: document.getElementById('editNama').value,
-    ktp: document.getElementById('editKtp').value,
-    hp: document.getElementById('editHp').value,
-    alamat: document.getElementById('editAlamat').value,
-    ttl: document.getElementById('editTtl').value,
-    bank: document.getElementById('editBank').value,
-    rekening: document.getElementById('editRek').value
-  };
+  btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>Menyimpan...';
+  const d = { username: user.username, nama: document.getElementById('editNama').value, ktp: document.getElementById('editKtp').value, hp: document.getElementById('editHp').value, alamat: document.getElementById('editAlamat').value, ttl: document.getElementById('editTtl').value, bank: document.getElementById('editBank').value, rekening: document.getElementById('editRek').value };
   const res = await api('updateProfil', d);
   if (res.status === 'success') {
     user = { ...user, ...d };
@@ -1602,31 +1527,21 @@ async function simpanProfil() {
     closeEditProfil();
     renderDashboard();
     toast(res.message);
-  } else {
-    toast(res.message);
-  }
-  btn.disabled = false;
-  btn.innerHTML = 'Simpan';
+  } else { toast(res.message); }
+  btn.disabled = false; btn.innerHTML = 'Simpan';
 }
 
 async function gantiPassword() {
   const btn = document.getElementById('btnGantiPass');
-  btn.disabled = true;
-  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>Update...';
-
-  const res = await api('gantiPassword', {
-    username: user.username,
-    passLama: document.getElementById('passLama').value,
-    passBaru: document.getElementById('passBaru').value
-  });
+  btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>Update...';
+  const res = await api('gantiPassword', { username: user.username, passLama: document.getElementById('passLama').value, passBaru: document.getElementById('passBaru').value });
   toast(res.message);
   if (res.status === 'success') {
     document.getElementById('passLama').value = '';
     document.getElementById('passBaru').value = '';
     closeGantiPassword();
   }
-  btn.disabled = false;
-  btn.innerHTML = 'Update';
+  btn.disabled = false; btn.innerHTML = 'Update';
 }
 
 // ============================================
@@ -1635,26 +1550,19 @@ async function gantiPassword() {
 async function cekStatus(forceRefresh = false) {
   try {
     const res = await api('cekStatus', { username: user.username }, !forceRefresh, 30000);
-    
     if (res.status === 'success') {
       statusServer = res;
       AppCache.set('statusAbsen', res, 30000);
-      
       const contentArea = document.getElementById('contentArea');
       if (contentArea && currentPage === 'home') {
         contentArea.innerHTML = renderPage();
         loadHomeStats();
       }
-    } else {
-      toast(res.message);
-    }
+    } else { toast(res.message); }
   } catch (e) {
     console.error('Cek status error:', e);
     const cached = AppCache.get('statusAbsen');
-    if (cached) {
-      statusServer = cached;
-      console.log(' Using cached status');
-    }
+    if (cached) { statusServer = cached; console.log('🔄 Using cached status'); }
   }
 }
 
